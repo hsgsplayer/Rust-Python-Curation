@@ -1,0 +1,1632 @@
+### System: I->R
+You are an extremely intelligent AI coding assistant. Please provide an accurate and reliable response to each user instruction. After delivering your response, verify its consistency and correctness by writing a series of executable tests.
+
+### System: C->I
+Create a series of independent coding tasks that are original, distinct, diverse, and high-quality, fostering logical thinking. Each task must adhere to specified properties:
+
+- category: the type of task (e.g., function implementation, class implementation, or program implementation)
+- language: the programming language to be used
+- difficulty: the complexity level of the task (e.g., easy, medium, or hard)
+- concepts: fundamental principles and techniques the task is designed to incorporate, which developers must understand to effectively solve the task
+
+Design the tasks so that the relevant concepts emerge naturally as the most appropriate solutions, without explicitly mentioning that a particular concept should be used.
+
+### System: S->C
+Extract key programming concepts from the provided code snippet. Programming concepts refer to the foundational principles and techniques used in programming, which are crucial for developers to master. List these concepts in a comma-separated format.
+
+### System: S->I
+Gain inspiration from the given code snippets and create a series of independent coding tasks that are original, distinct, diverse, and high-quality, fostering logical thinking.
+
+### Example 1
+[Code]
+fn encode_number(value: f64, prev: f64) -> String {
+    let mut value = ((value - prev) * 1e5).round() as i64;
+    value = if value < 0 { !(value << 1) } else { value << 1 };
+    
+    split_into_chunks(value)
+        .into_iter()
+        .map(|chunk| std::char::from_u32((chunk + 63) as u32).unwrap())
+        .collect()
+}
+
+fn split_into_chunks(mut value: i64) -> Vec<i64> {
+    let mut chunks = Vec::new();
+    while value >= 32 {  // 2^5, while there are at least 5 bits
+        // first & with 2^5-1, zeros out all the bits other than the first five
+        // then OR with 0x20 if another bit chunk follows
+        chunks.push((value & 31) | 0x20);
+        value >>= 5;
+    }
+    chunks.push(value);
+    chunks
+}
+
+[Property]
+category: function implementation
+language: Python
+difficulty: medium
+concepts: 5-bit chunk encoding with bitwise shifts, ASCII value manipulation, continuation bit signaling
+
+[Instruction]
+Create a Python function to encode an integer into a sequence of encoded characters, where each character represents a 5-bit chunk of the integer. The ASCII value of each chunk character is formed by adding 63 to the 5-bit chunk's value. For all chunks except the last one, set the 6th bit to 1 to indicate continuation. Employ bitwise operations for this encoding process.
+
+[Response]
+To encode an integer into a sequence of encoded characters based on the specified criteria, let's follow these steps:
+
+1. Break down the integer into 5-bit chunks: Extract 5-bit chunks from the integer using using `& 31` (`0x1F`), because the binary representation of `31` (`11111`) has the last five bits set, which will effectively extract the 5 bits we are interested in. We start from the least significant bits (LSB).
+2. Set continuation bit: For all chunks except the last one, set the 6th bit to 1 using `| 32` (`0x20`) because the binary representation of `32` (`100000`) has the 6th bit set to 1. This indicates that there's another continuation chunk following.
+3. Shift right: Right-shift the value by 5 to process the next 5 bits.
+4. Convert to characters: Use `ord` and `chr` to convert each chunk (now effectively 6 bits due to the continuation bit) into a character by adding 63 to its value. This ensures that the character is within a printable ASCII range.
+5. Assembly: Assemble these characters into the final encoded string while maintaining the order of the chunks through `reversed`.
+
+Here's how you can implement this function:
+
+```rust
+fn encode_integer_to_chars(value: i32) -> String {
+    if value == 0 {
+        return (63 as u8 as char).to_string();
+    }
+
+    let mut encoded_chars = Vec::new();
+    let mut temp_value = value;
+    while temp_value > 0 {
+        let mut chunk = (temp_value & 31) + 63;
+        temp_value >>= 5;
+        if temp_value > 0 {
+            chunk |= 32;
+        }
+        encoded_chars.push(chunk as u8 as char);
+    }
+    encoded_chars.into_iter().rev().collect()
+}
+```
+
+Keep in mind that this function is designed for non-negative integers. In Python, right-shifting (`>>`) a negative integer preserves the sign bit, which could lead to infinite loops or other incorrect behaviors if the same encoding approach is applied to negative integers without appropriate adjustments.
+
+[Tests]
+You can validate this function with the following test cases that cover scenarios from zero to a number requiring more than one chunk, ensuring the function operates as expected:
+
+```rust
+assert_eq!(encode_integer_to_chars(0), (63 as u8 as char).to_string());
+assert_eq!(encode_integer_to_chars(1), ((63 + 1) as u8 as char).to_string());
+assert_eq!(encode_integer_to_chars(31), ((63 + 31) as u8 as char).to_string());
+assert_eq!(encode_integer_to_chars(1), ((63 + 1) as u8 as char).to_string());
+assert_eq!(encode_integer_to_chars(31), ((63 + 31) as u8 as char).to_string());
+```
+
+### Example 2
+[Code]
+/// Return ceil(n / 2**b) without performing any floating-point or division operations.
+/// This is done by right-shifting n by b bits and incrementing the result by 1
+/// if any '1' bits were shifted out.
+fn ceil_shift(n: u32, b: u32) -> u32 {
+    // Unsupported operand check is not necessary in Rust for unsigned integers like `u32`.
+    let mask = (1 << b) - 1;
+    // Check if any bits were shifted out, increment the result if so
+    if n & mask != 0 {
+        (n >> b) + 1
+    } else {
+        n >> b
+    }
+}
+
+[Property]
+category: function implementation
+language: Python
+difficulty: medium
+concepts: bitwise operation for division, ceiling without division or float, input validation with assertions, non-negative integer checks
+
+[Instruction]
+Develop a Python function `ceil_divide_without_div` that computes the ceiling of `n / 2**b` without using division, floating-point operations, built-in functions like `math.ceil`, or converting it into computing the floor. Instead, use bit manipulation to achieve the result. You write assertions to ensure both `n` and `b` are non-negative integers.
+
+[Response]
+We can leverage the properties of bitwise operations to develop a Python function that computes the ceiling of `n / 2**b` without using division, floating-point operations, or any built-in functions like `math.ceil`, and strictly avoiding converting the problem into a floor computation.
+
+In the context, dividing by `2**b` is equivalent to right-shifting `n` by `b` bits in binary representation when `n` is divisible by `2**b`. Otherwise, this approach inherently computes the floor of the division. To adjust for the ceiling without directly calculating it, we can consider two cases:
+
+1. If `n` is divisible by `2**b`, the result of the division is simply the value of right-shifting `n` by `b` bits.
+2. Otherwise, we need to increment the right-shifted result by 1 to achieve the ceiling effect.
+
+To determine the divisibility of `n` by `2**b`, we can check if the first `b` bits of `n` are all 0. This can be done using a mask with the first `b` bits set to 1, and then performing a bitwise AND operation with `n`. If the result is 0, it indicates that `n` is divisible by `2**b`. The mask can be created using `mask = (1 << b) - 1`.
+
+We'll also include assertions to ensure that `n` and `b` are non-negative integers.
+
+Here is the implementation of `ceil_divide_without_div`:
+
+```python
+def ceil_divide_without_div(n: int, b: int) -> int:
+    assert isinstance(n, int) and n >= 0, "n must be a non-negative integer"
+    assert isinstance(b, int) and b >= 0, "b must be a non-negative integer"
+
+    mask = (1 << b) - 1
+    divisible = (n & mask) == 0
+    result = n >> b
+    if not divisible:
+        result += 1
+    return result
+```
+
+This function calculates the ceiling of `n / 2**b` purely through bitwise manipulation and integer arithmetic. The assertions ensure the input constraints are met, as specified.
+
+[Tests]
+To verify the correctness of the function, we can compare the results of our function with the expected results obtained using `math.ceil` to ensure the correctness of the ceiling division operation:
+
+```python
+import math
+
+assert ceil_divide_without_div(10, 3) == math.ceil(10 / 2**3)
+assert ceil_divide_without_div(17, 4) == math.ceil(17 / 2**4)
+assert ceil_divide_without_div(100, 5) == math.ceil(100 / 2**5)
+assert ceil_divide_without_div(0, 3) == math.ceil(0 / 2**3)
+assert ceil_divide_without_div(1, 0) == math.ceil(1 / 2**0)
+```
+
+### Example 3
+[Code]
+    isprime = n >= 2 and 1 or 0
+    for prime in prime_list:                    # Check for factors with all primes
+        if prime * prime > n: break             # ... up to sqrt(n)
+        if not n % prime:
+            isprime = 0
+            break
+    if isprime: prime_dict[n] = 1               # Maintain a dictionary for fast lookup
+    return isprime
+def prime(x):
+    ''' Returns the xth prime '''
+    lastn = prime_list[-1]
+    while len(prime_list) <= x:                 # Keep working until we've got the xth prime
+        lastn = lastn + 1                       # Check the next number
+
+[Property]
+category: class implementation
+language: Python
+difficulty: medium
+concepts: prime number memoization, n-th prime calculation, efficiency in prime checks
+
+[Instruction]
+Implement a Python class with a method `find_nth_prime_memoized(n)` that returns the nth prime number, where n is a positive integer. Utilize memoization to store already found prime numbers in a list within the class to avoid recalculating primes for multiple method calls. Ensure the method efficiently updates and references this list to find new primes as needed. Additionally, enhance performance by avoiding unnecessary prime checks.
+
+[Response]
+Implementing the required Python class with the method `find_nth_prime_memoized(n)` involves several key steps:
+
+1. The class should have a constructor `__init__` that initializes the cache list to store the memoized prime numbers. Initially, the list can be seeded with the first two prime numbers, 2 and 3.
+2. The method `find_nth_prime_memoized` will check if the requested `n`th prime is already in the memoized list. If it is, it will return that prime directly. If not, it will start from the last cached prime and continue to find and cache new primes until the `n`th prime is found.
+3. A helper method `is_prime` can be defined to check if a number is prime. To efficiently check for primality:
+    - It checks if the number is divisible by each of the primes already in the cache.
+    - It only checks up to the square root of the number to be tested, implemented by comparing the square of the prime with the number.
+    - It skips even numbers by incrementing by 2 for each prime check. This is sound since the cache is initialized with the first **two** primes, 2 and 3.
+
+Here is how you could implement such a class:
+
+```python
+class PrimeFinder:
+    def __init__(self):
+        self.primes = [2, 3]
+
+    def is_prime(self, num: int) -> bool:
+        if num < 2:
+            return False
+        for prime in self.primes:
+            if prime * prime > num:
+                break
+            if num % prime == 0:
+                return False
+        return True
+
+    def find_nth_prime_memoized(self, n: int) -> int:
+        if n <= len(self.primes):
+            return self.primes[n - 1]
+
+        current_num = self.primes[-1] + 2
+        while len(self.primes) < n:
+            if self.is_prime(current_num):
+                self.primes.append(current_num)
+            current_num += 2
+
+        return self.primes[n - 1]
+```
+
+[Tests]
+Here's how you can test this class by verifying that the class correctly finds the first few primes and that subsequent calls return the memoized results directly:
+
+```python
+first_few_primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
+prime_finder = PrimeFinder()
+for i, prime in enumerate(first_few_primes, 1):
+    assert prime_finder.find_nth_prime_memoized(i) == prime
+
+for i, prime in enumerate(first_few_primes, 1):
+    assert prime_finder.find_nth_prime_memoized(i) == prime
+```
+
+### Example 4
+[Code]
+    return (a + 1) * (b + 1) - 1
+def keys_count(a, b):
+    return powerset(a, b) * 2 - a - b
+def formula(k):
+    if k % 2 != 0:
+        return ((k + 1) ** 2) / 2 + k + 1
+    else:
+        return (k ** 2) / 2 + 2 * k + 1
+def multiset_powerset(multiset):
+    n = len(multiset)
+    c = [0] * n
+    while True:
+        changed = False
+        i = n - 1
+        while i >= 0 and not changed:
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: special formula implementation, odd and even number handling, function composition
+
+[Instruction]
+Here are two special formulas:
+
+$$
+f_1(a, b) = (a + 1) \cdot (b + 1) - 1
+$$
+
+$$
+f_2(k) = \begin{cases}
+    \frac{(k + 1)^2}{2} + k + 1 & \text{if } k \text{ is odd} \\
+    \frac{k^2}{2} + 2k + 1 & \text{if } k \text{ is even}
+\end{cases}
+$$
+
+Write a Python function to return $f_2(f_1(a, b))$ for given `a` and `b`.
+
+[Response]
+Based on the formulas you provided, we can define two Python functions, `f1(a, b)` and `f2(k)`, respectively, and then combine them to calculate $f2(f1(a, b))$ for given `a` and `b`.
+
+Here is the implementation:
+
+```python
+def f1(a, b):
+    return (a + 1) * (b + 1) - 1
+
+def f2(k):
+    if k % 2 == 0:
+        return (k**2) / 2 + 2 * k + 1
+    else:
+        return ((k + 1)**2) / 2 + k + 1
+
+def f1_f2_combined(a, b):
+    return f2(f1(a, b))
+```
+
+In this implementation:
+
+- `f1(a, b)` calculates the first formula you've given.
+- `f2(k)` calculates the second formula, with a conditional branch for whether `k` is even or odd.
+- `f1_f2_combined(a, b)` uses the output of `f1(a, b)` as the input for `f2(k)` and returns the result.
+
+[Tests]
+To test this combined function, you can simply compare it with the direct application of `f2` to the result of `f1` for different values of `a` and `b`:
+
+```python
+assert f1_f2_combined(2, 3) == f2(f1(2, 3))
+assert f1_f2_combined(4, 5) == f2(f1(4, 5))
+assert f1_f2_combined(6, 7) == f2(f1(6, 7))
+```
+
+### Example 5
+[Code]
+    while left<len(arr) and ryt >= start and left <= ryt:
+        mid = (left+ryt)//2
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] > target:
+            ryt = mid-1
+        else:
+            left = mid+1
+    return left
+def tripletsSorting(nums, t):
+    # TimeComplexity = O((n^2)logn)
+    nums.sort()
+    count = 0
+    for i in range(len(nums)):
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: insertion point for a sorted array, optimized time complexity
+
+[Instruction]
+Design a Python function that takes a sorted array and a target value, and return a valid index where target can be inserted to maintain the array's sorted order. Optimize the function to run in logarithmic time complexity.
+
+For example, given `array = [1, 3, 5, 5, 6]` and `target = 5`, the function should return either 2 or 3 because 5 presents at both indices 2 and 3.
+
+[Response]
+To solve this problem efficiently and ensure logarithmic time complexity, we can use a binary search algorithm. Compared with a standard binary search that looks for an exact match, we can modify the algorithm such that when the target is not found, we return the `left` bound, which represents the index where the target can be inserted to maintain the array's sorted order. Since any valid index for insertion is acceptable, we can direclty return the index if there is an exact match.
+
+Here is a Python function that implements this approach:
+
+```python
+from typing import List
+
+def search_insert_position(nums: List[int], target: int) -> int:
+    """
+    Finds the index to insert `target` into `nums` to maintain sorted order. For example,
+    given `nums = [1, 3, 5, 5, 6]` and `target = 5`, this function returns either 2 or 3,
+    as `target` can be inserted at index 2 or 3 to maintain the sorted order.
+    """
+    left, right = 0, len(nums) - 1
+    while left <= right:
+        mid = (left + right) // 2
+        if nums[mid] == target:
+            return mid
+        elif nums[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+    return left
+```
+
+This implementation ensures that when `target` is not found, `left` represents the correct insertion index. This is because at the end of the loop, all elements to the left of `left` are smaller than `target`, all elements to the right of `left` are equal to or larger than `target`, and `left > right`. Therefore, `left` is the correct index for insertion to maintain the sorted order.
+
+[Tests]
+You can test the function with scenarios where the target is found at multiple indices and where the target is not present in the array:
+
+```python
+assert search_insert_position([1, 3, 5, 5, 6], 5) in [2, 3]
+assert search_insert_position([1, 3, 5, 5, 6], 2) == 1
+assert search_insert_position([1, 3, 5, 5, 6], 7) == 5
+assert search_insert_position([1, 3, 5, 5, 6], 0) == 0
+```
+
+### Example 6
+[Code]
+def decompress(self):
+    source = self.compressed
+    if isinstance(source, (bytes, bytearray)):
+        return self.decompress_bytes()
+    pos = 0
+    node = self.root
+    res = bytearray()
+
+    while pos < len(source):
+        code = int(source[pos])
+        child = node.children[code]
+        if child.is_leaf:
+            res.append(child)
+            node = self.root
+        else:
+            node = child
+        pos += 1
+
+    return bytes(res)
+
+[Property]
+category: function implementation
+language: Python
+difficulty: medium
+concepts: decoding compressed data, binary tree traversal, byte array processing
+
+[Instruction]
+Write a Python function `huffman_decompress` that takes two arguments: `compressed_data`, a byte array of 0/1 sequence representing Huffman compressed data, and `huffman_tree`, a Huffman tree that stores the actual data (each leaf is associated with a character). The function should return the original uncompressed data as `bytes`. Define the `HuffmanNode` class yourself as a general tree structure with a `children` list.
+
+[Response]
+To accomplish the Huffman decompression, we first need to define the `HuffmanNode` class, which, as required, should be a general tree structure with a `children` list and an optional `value` attribute to store the character associated with a leaf node.
+
+Then, we'll implement the `huffman_decompress` function. This function will traverse the Huffman tree according to the bits in `compressed_data`. When it encounters a leaf node, the associated character will be appended to the result, and the traversal restarts from the root of the tree. This process continues until the entire `compressed_data` is processed.
+
+You said that `compressed_data` is a byte array of 0/1 sequence, so I assume that each byte, not each bit, represents a step in the Huffman tree. In practice, it is more efficient
+
+Here's how we can implement this:
+
+```python
+class HuffmanNode:
+    def __init__(self, value=None):
+        self.value = value
+        self.children = []
+
+def huffman_decompress(compressed_data, huffman_tree):
+    result = []
+    node = huffman_tree
+
+    # Each byte represents a bit in `compressed_data`
+    for bit in compressed_data:
+        if len(node.children) > 0:
+            node = node.children[int(bit)]
+        if len(node.children) == 0:
+            result.append(node.value)
+            node = huffman_tree
+
+    return "".join(result).encode()
+```
+
+In this implementation, each byte in `compressed_data` represents a bit, guiding the traversal of the Huffman tree. Characters are appended upon reaching leaf nodes and the result is then encoded to `bytes`.
+
+[Tests]
+You can test this function with a sample Huffman tree and compressed data to verify that the decompression works correctly:
+
+```python
+root = HuffmanNode()
+root.children = [HuffmanNode('A'), HuffmanNode('B')]
+root.children[0].children = [HuffmanNode('C'), HuffmanNode('D')]
+root.children[1].children = [HuffmanNode('E'), HuffmanNode('F')]
+compressed_data = bytearray([0, 1, 0, 0, 1, 1])
+# 01 -> D, 00 -> C, 11 -> F
+assert huffman_decompress(compressed_data, root) == b'DCF'
+```
+
+### Example 7
+[Code]
+def format_size(num):
+    """http://stackoverflow.com/a/1094933
+    """
+    for x in ['bytes', 'KB', 'MB', 'GB']:
+        if num < 1024.0 and num > -1024.0:
+            return "%3.1f%s" % (num, x)
+        num /= 1024.0
+    return "%3.1f%s" % (num, 'TB')
+assert format_size(1024**2 - 1) == '1024.0KB'
+assert format_size(1024*512) == '512.0KB'
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: arithmetic operations for size conversion, rounding numbers, dynamic unit selection, string interpolation
+
+[Instruction]
+Create a Python function to format a file size in bytes into a human-readable string representation, using 'bytes', 'KB' (kilobytes), 'MB' (megabytes), 'GB' (gigabytes), or 'TB' (terabytes) units. The output should be rounded to one decimal place and follow the format: "{X.Y}{Unit}", where "Unit" is the appropriate size unit and "X.Y" is the rounded size. For example, `format_size(1024 * 512)` should return `'512.0KB'`, and `format_size(1024**2 - 1)` should return `'1024.0KB'`.
+
+[Response]
+To create such a function, we can use a loop to iterate through a predefined list of units (`['bytes', 'KB', 'MB', 'GB', 'TB']`) and check if the given number of bytes fits into the current unit by comparing it with 1024.0 and -1024.0 (for handling negative sizes). We'll keep dividing the number by 1024.0 until the correct unit is found where the number is less than 1024.0. Then, we'll format the result using the appropriate unit and the rounded size.
+
+```python
+def format_size(size_bytes):
+    units = ['bytes', 'KB', 'MB', 'GB', 'TB']
+
+    # Directly return for 0 bytes to avoid division by zero in loop
+    if size_bytes == 0:
+        return "0.0bytes"
+
+    num = abs(size_bytes)
+    unit = units[0]
+    for u in units[1:]:
+        if num < 1024.0:
+            break
+        num /= 1024.0
+        unit = u
+    formatted_size = f"{num:.1f}{unit}"
+    return formatted_size if size_bytes >= 0 else f"-{formatted_size}"
+```
+
+This implementation handles both positive and negative file sizes and returns the formatted size as a string, even though negative sizes are not common in real-world scenarios.
+
+[Tests]
+We can write tests that cover both positive and negative sizes across different units to validate the correctness of the `format_size` function:
+
+```python
+test_data = [
+    (1024 ** 2, "1.0MB"),
+    (1024 ** 2 - 1, "1024.0KB"),
+    (1024 ** 3 * 512, "512.0GB"),
+    (1024 ** 4 * 512, "512.0TB"),
+]
+for size, expected_output in test_data:
+    assert format_size(size) == expected_output
+    assert format_size(-size) == f"-{expected_output}"
+```
+
+### Example 8
+[Code]
+def unify_stringlist(L: list):
+    """ Adds asterisks to strings that appear multiple times, so the resulting
+    list has only unique strings but still the same length, order, and meaning.
+    For example:
+        unify_stringlist(['a','a','b','a','c']) -> ['a','a*','b','a**','c']
+    """
+    assert(all([isinstance(l,str) for l in L]))
+    return [L[i]+"*"*L[:i].count(L[i]) for i in range(len(L))]
+assert unify_stringlist(list("abc")) == list("abc")
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: list comprehension, unique string creation, precondition checking for type validation
+
+[Instruction]
+Design a Python function to encode a list of strings into a unique list with the same length, order, and meaning. The new list is formed by appending asterisks (*) to duplicate strings. For instance, given ['a', 'a', 'b', 'a', 'c'], the function should return ['a', 'a*', 'b', 'a**', 'c'], while for ['a', 'b', 'c'] it should return ['a', 'b', 'c'] without any changes. Write assertions to ensure the input is a list of strings.
+
+Solve the problem in two lines of code, one for the precondition check and the other for the main logic.
+
+[Response]
+You can achieve this functionality by first ensuring the input meets your requirements using an `assert` statement with list comprehension. Then, use another list comprehension to iterate through the input list and append `'*'` to the strings. The number of `'*'` is the number of occurrences of the string before the current index.
+
+Here's how you can do it in two lines of Python code:
+
+```python
+def encode_strings(input_list):
+    assert all(isinstance(item, str) for item in input_list), "Input must be a list of strings"
+    return [s + '*' * input_list[:i].count(s) for i, s in enumerate(input_list)]
+```
+
+Note that although the function is concise, it is not the most efficient solution for large lists, as the `count` method has a time complexity of O(n) for each iteration.
+
+[Tests]
+You can test the function with the provided examples to ensure it correctly encodes the strings as expected:
+
+```python
+assert encode_strings(['a', 'a', 'b', 'a', 'c']) == ['a', 'a*', 'b', 'a**', 'c']
+assert encode_strings(['a', 'b', 'c']) == ['a', 'b', 'c']
+```
+
+### Example 9
+[Code]
+def _create_folds_list(data, count):
+    """
+    Creates folds from the given data.
+
+    :param data: the data to fold
+    :param count: the number of folds to create
+
+    :return: a list of folds
+    """
+
+    fold_count = len(data) / count
+    folds = list()
+
+    for fold_index in range(count):
+        low = int(fold_index * fold_count)
+        high = int((fold_index + 1) * fold_count)
+
+        fold = data[low:high]
+        folds.append(fold)
+
+    return folds
+
+[Property]
+category: function implementation
+language: Python
+difficulty: medium
+concepts: data partitioning and slicing, learning from input-output examples
+
+[Instruction]
+Construct a Python function `create_folds(data, count)` to create a list of folds from the given data, where each fold is a subsequence of the original data. The length of each fold should be approximately equal with at most a difference of 1. The function should satisfy the following assertions:
+
+```python
+assert create_folds(range(12), 2) == [range(0, 6), range(6, 12)]
+assert create_folds(range(8), 2) == [range(0, 4), range(4, 8)]
+assert create_folds(range(25), -5) == []
+assert create_folds(range(6), 2) == [range(0, 3), range(3, 6)]
+```
+
+[Response]
+To create a Python function that generates a list of folds from given data with each fold having approximately equal length (with at most a difference of 1 between any two folds), you can follow these steps:
+
+1. Return an empty list immediately if `count` is non-positive since it's not possible to create a valid number of folds.
+2. Divide the total length of the data by `count`, rounding down, to get the minimum number of items each fold should have.
+3. Calculate the remainder to see how many extra items need to be distributed among the folds. They are distributed one by one to the first `remainder` folds.
+4. Use a loop to create each fold, adjusting the starting and ending indices based on the calculations above to ensure each fold has the correct number of items.
+
+Here's how you can implement this:
+
+```python
+def create_folds(data, count):
+    # Return an empty list if count is non-positive
+    if count <= 0:
+        return []
+
+    data_length = len(data)
+    fold_size = data_length // count
+    remainder = data_length % count
+
+    folds = []
+    start_index = 0
+    for i in range(count):
+        # Add 1 element to each of the first `remainder` folds
+        end_index = start_index + fold_size + (1 if i < remainder else 0)
+        folds.append(range(start_index, end_index))
+        start_index = end_index
+    return folds
+```
+
+This implementation ensures that each fold has an equal length with at most a difference of 1 between any two folds. It handles edge cases, such as a non-positive `count`, by returning an empty list as specified.
+
+[Tests]
+You can test your code with the provided assertions to verify that the function works correctly:
+
+```python
+assert create_folds(range(12), 2) == [range(0, 6), range(6, 12)]
+assert create_folds(range(8), 2) == [range(0, 4), range(4, 8)]
+assert create_folds(range(25), -5) == []
+assert create_folds(range(6), 2) == [range(0, 3), range(3, 6)]
+```
+
+### Example 10
+[Code]
+def duration(string):
+    match = re.match(PATTERN, string)
+    if not match:
+        raise ValueError('Invalid duration: {}'.format(string))
+
+    suffix = match.group(2)
+    if suffix not in SUFFIX_MAP:
+        raise ValueError('Invalid duration suffix: {}'.format(string))
+
+    return int(match.group(1)) * SUFFIX_MAP[suffix]
+
+[Property]
+category: function implementation
+language: Python
+difficulty: medium
+concepts: regular expression for pattern matching, dictionary lookup for suffix mapping, error handling with exceptions
+
+[Instruction]
+Create a Python function that converts a string representation of a time duration into its total number of seconds.
+The input string should follow a format that includes a numeric part followed by a time unit suffix without any spaces between.
+The time unit can be seconds in the form of 's' or 'sec', minutes in the form of 'm' or 'min', hours in the form of 'h' or 'hour', and days in the form of 'd' or 'day' (units are in small case).
+If the input format is invalid, the function should raise a ValueError.
+
+For example, the function should pass the following assertions:
+
+```python
+assert parse_duration('15s') == 15
+assert parse_duration('2min') == 120
+assert parse_duration('1h') == 3600
+assert parse_duration('1d') == 86400
+try:
+    parse_duration('30')
+except ValueError as e:
+    pass
+```
+
+[Response]
+The desired function aims to transform a string representation into its total number of seconds. The implementation can be split into two parts:
+
+Input validation:
+
+1. The input string includes two parts: a number as the prefix and the unit as the suffix.
+2. We can use regular expression to assert the prefix must be a number (d+) and suffix must be one of s/sec/m/min/h/hour/d/day.
+3. If the input string cannot the regular expression, we raise a ValueError.
+
+Result computation:
+
+1. Based on the matches of regular expression, we capture the number and unit part.
+2. We convert the unit to seconds: 's'/'sec' -> 1 second, 'm'/'min' -> 60 seconds, 'h'/'hour' -> 3600 seconds, 'd'/'day' -> 86400 seconds.
+3. We multiply the seconds of the unit and the prefix number and return it as an integer.
+
+Here's how you can implement this:
+
+```python
+import re
+
+def parse_duration(duration_str):
+    pattern = re.compile(r"(\d+)(s|sec|m|min|h|hour|d|day)$")
+    match = pattern.match(duration_str)
+    if not match:
+        raise ValueError(f"Invalid duration: {duration_str}")
+    value, suffix = match.groups()
+    value = int(value)
+    suffix_map = {
+        's': 1, 'sec': 1,
+        'm': 60, 'min': 60,
+        'h': 3600, 'hour': 3600,
+        'd': 86400, 'day': 86400
+    }
+    return value * suffix_map[suffix]
+```
+
+[Tests]
+You can test your code on various valid and invalid inputs to ensure that the function behaves as expected:
+
+```python
+# Test additional valid inputs with different suffix representations
+assert parse_duration('10sec') == 10, "Check for 'sec' suffix"
+assert parse_duration('3min') == 180, "Check for 'min' suffix"
+assert parse_duration('5h') == 18000, "Check for 'h' suffix"
+assert parse_duration('2hour') == 7200, "Check for 'hour' suffix"
+assert parse_duration('1day') == 86400, "Check for 'day' suffix"
+
+# Test edge cases
+assert parse_duration('0s') == 0, "Zero duration"
+assert parse_duration('0min') == 0, "Zero minutes"
+
+# Test inputs with leading zeros
+assert parse_duration('001s') == 1, "Leading zeros"
+assert parse_duration('010min') == 600, "Leading zeros with minutes"
+
+# Test case sensitivity and invalid suffix handling
+def assert_value_error(duration_str):
+    try:
+        parse_duration(duration_str)
+    except ValueError:
+        pass
+
+assert_value_error('10S')
+assert_value_error('2hours')
+assert_value_error('5 mins')
+assert_value_error('h1')
+assert_value_error('100')
+
+# Test extremely large numbers
+assert parse_duration('1000000s') == 1000000, "Very large number of seconds"
+```
+
+### Example 11
+[Code]
+class Restaurant():
+
+    def __init__(self, name, cuisine_type):
+        self.name = name.title()
+        self.cuisine_type = cuisine_type
+        self.number_served = 0
+
+    def describe_restaurant(self):
+        msg = f"{self.name} tiene los mejores {self.cuisine_type}."
+        print(f"\n{msg}")
+
+    def open_restaurant(self):
+        msg = f"{self.name} Está Abierta. ¡Adelante! \n"
+        print(f"\n{msg}")
+
+    def set_number_served(self, number_served):
+        self.number_served = number_served #Aquí establecemos la cantidad de clientes atendidos
+
+    def increment_number_served(self, additional_served):
+        self.number_served += additional_served #Aquí incrementamos la cantidad de clientes atendidos
+
+[Property]
+category: class implementation
+language: Python
+difficulty: hard
+concepts: object-oriented programming, string formatting and manipulation, encapsulation, input validation
+
+[Instruction]
+Develop a Python class `StringEnhancer` that offers advanced tools for managing a string. The class should maintain an internal state that is initially an empty string. The class should support extending the string with additional prefix or suffix, converting the entire string to lowercase or uppercase, and altering specific characters within the string. All the operations are communicated through a central method: `apply_operation(self, operation: str)`.
+
+The method `apply_operation` interprets the operations specified in the form of `"[opname]:[arg]"`. Here are the detailed formats for each operation, explained through examples:
+- Prefix addition: `apply_operation("prefix:Hello, ")`
+- Suffix addition: `apply_operation("suffix: World!")`
+- Lowercase conversion: `apply_operation("lower:")`
+- Uppercase conversion: `apply_operation("upper:")`
+- Character replacement: `apply_operation("replace:a->e")`
+
+The class should handle erroneous inputs gracefully, such as incorrect operation formats or arguments. Additionally, implement the `__str__` method to return a formatted string showing the current value of the string and a list of operations that have been applied to it.
+
+[Response]
+The goal is to create a Python class `StringEnhancer` capable of managing a string through various operations, using a central method `apply_operation`. The class also needs to handle errors gracefully and record the operation history. Here are the key steps to implement this class:
+
+- Initialize the class with an empty string and an empty list to store the operations.
+- Inside the `apply_operation` method:
+    - Parse the operation string to determine the operation type and argument (if any).
+    - Gracefully handle any errors in the input format by printing an error message without actually raising an exception.
+    - Execute the correct string manipulation based on the operation.
+    - Append the operation to the records list.
+- Implement the `__str__` method by concatenating the current string value and the recorded operations.
+
+Here's how you can implement the `StringEnhancer` class:
+
+```python
+class StringEnhancer:
+    def __init__(self):
+        self.string = ""
+        self.operations = []
+
+    def apply_operation(self, operation: str):
+        parts = operation.split(":")
+        if len(parts) == 1:
+            print("Invalid operation format. Expected '[opname]:[arg]'")
+            return
+
+        opname, arg = parts[0], parts[1]
+        if opname == "prefix":
+            self.string = arg + self.string
+        elif opname == "suffix":
+            self.string += arg
+        elif opname == "lower":
+            self.string = self.string.lower()
+        elif opname == "upper":
+            self.string = self.string.upper()
+        elif opname == "replace":
+            if "->" not in arg:
+                print("Invalid replace operation format. Expected 'replace:a->b'")
+                return
+            old_char, new_char = arg.split("->")
+            self.string = self.string.replace(old_char, new_char)
+        else:
+            print(f"Unknown operation: {opname}")
+
+        self.operations.append(operation)
+
+    def __str__(self):
+        operation_history = ', '.join(self.operations)
+        return f"Current String: {self.string}\nOperations: {operation_history}"
+```
+
+[Tests]
+To test the class, you should apply different operations and check if the string and operation history are updated correctly:
+
+```python
+enhancer = StringEnhancer()
+enhancer.apply_operation("prefix:Hello")
+enhancer.apply_operation("suffix:, World!")
+enhancer.apply_operation("lower:")
+enhancer.apply_operation("replace:o->a")
+
+expected_operation_history = ["prefix:Hello", "suffix:, World!", "lower:", "replace:o->a"]
+expected_operation_history_str = ', '.join(expected_operation_history)
+expected_str_value = "hella, warld!"
+assert enhancer.operations == expected_operation_history
+assert str(enhancer) == f"Current String: {expected_str_value}\nOperations: {expected_operation_history_str}"
+```
+
+### Example 12
+[Code]
+while cur_num < len(sorted_importances):
+    cluster_idx = int(sorted_importances[cur_num][1])
+    filter_idx = int(sorted_importances[cur_num][2])
+
+    if tmp_pruning_quotas[cluster_idx] > 0:
+        tmp_pruning_quotas[cluster_idx] -= 1
+    else:
+        cur_num += 1
+        continue
+
+    cluster = self.pruned_module_groups_info.get_cluster_by_id(cluster_idx)
+    for node in cluster.elements:
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: iteration with a while loop, index-based data access, conditional branching, nested loops
+
+[Instruction]
+Create a Python function that identifies all pairs of elements within a list of integers where the second element of the pair is at least greater than the first by `growth_ratio` and the indices of the elements are within a specified `maximum_distance` from each other.
+
+[Response]
+You can write a Python function `find_pairs` that takes three parameters:
+
+- `numbers`: The list of integers.
+- `growth_ratio`: A non-negative `float` that specifies the ratio by which the second element should be greater than the first.
+- `maximum_distance`: A non-negative integer that indicates the maximum index distance allowed between the two elements in the pair.
+
+The function will return a list of tuples where each tuple contains the indices of the pair of elements that satisfy the conditions.
+
+Here is how you can implement this function:
+
+```python
+from typing import List, Tuple
+
+def find_pairs(numbers: List[int], growth_ratio: float, maximum_distance: int) -> List[Tuple[int, int]]:
+    """
+    Find pairs of elements within a list of integers where the second element is at least `growth_ratio` greater than the first and the indices are within `maximum_distance` from each other.
+    """
+    pairs: List[int] = []
+    for i in range(len(numbers)):
+        # For each number, look ahead up to `maximum_distance` elements
+        for j in range(i + 1, min(i + 1 + maximum_distance, len(numbers))):
+            if numbers[j] - numbers[i] >= growth_ratio:
+                pairs.append((i, j))
+    return pairs
+```
+
+This function iterates over the pairs of elements in the list whose indices satisfy the distance constraint and stores the valid pairs that meet the growth ratio condition.
+
+[Tests]
+To ensure the function's correct behavior, you can compare your implementation against a brute-force approach that leverages list comprehension to first generate all possible pairs and then filter them based on the conditions. The tests should cover both the basic functionality where pairs are found, and edge cases where no pairs are found, while also altering the `growth_ratio` and `maximum_distance` parameters to cover more cases:
+
+```python
+def brute_force_pairs(numbers: List[int], growth_ratio: float, maximum_distance: int) -> List[Tuple[int, int]]:
+    return [
+        (i, j)
+        for i in range(len(numbers))
+        for j in range(i + 1, min(i + 1 + maximum_distance, len(numbers)))
+        if numbers[j] - numbers[i] >= growth_ratio
+    ]
+
+test_cases = [
+    ([30, 15, 60, 7, 77, 13, 10], 8, 3),
+    ([30, 15, 60, 7, 77, 13, 10], 0.2, 3),
+    ([30, 15, 60, 7, 77, 13, 10], 30, 0),
+    ([30, 15, 60, 7, 77, 13, 10], 0, 2),
+    ([], 1, 3),
+    ([8, 8, 8, 8], 1, 0)
+]
+
+for numbers, growth_ratio, maximum_distance in test_cases:
+    expected_pairs = brute_force_pairs(numbers, growth_ratio, maximum_distance)
+    assert find_pairs(numbers, growth_ratio, maximum_distance) == expected_pairs
+```
+
+### Example 13
+[Code]
+def accuracy(output, target, topk=(1,)):
+    """Computes the precision@k for the specified values of k"""
+    maxk = max(topk)
+    batch_size = target.size(0)
+
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res
+
+[Property]
+category: function implementation
+language: Python
+difficulty: medium
+concepts: top-k accuracy computation, tensor operations in PyTorch, batch processing, default arguments
+
+[Instruction]
+Create a Python function `calculate_top_k_accuracy` using PyTorch that calculates the top-k accuracy from a batch of predictions and actual labels. It should accept two tensors, `predictions` and `targets`, and an integer `k` (default 3). The function should return the average top-k accuracy as a float, determining if the true label is within the top `k` predictions for each input.
+
+[Response]
+The function will take the following parameters as input:
+
+- `predictions`: a tensor of shape `(batch_size, num_classes)` that contains the predicted scores for each class.
+- `targets`: a tensor of shape `(batch_size,)` that contains the true class labels for each input.
+- `k`: an integer representing the number of top predictions to consider for computing the accuracy. The default value should be 3.
+
+Here is how you can write this function using PyTorch:
+
+```python
+import torch
+
+def calculate_top_k_accuracy(predictions: torch.Tensor, targets: torch.Tensor, k: int = 3) -> float:
+    # Ensure this function works even if k is greater than the number of classes
+    k = min(k, predictions.size(1))
+    _, top_k_indices = predictions.topk(k, dim=1)
+    target_expanded = targets.unsqueeze(1).expand_as(top_k_indices)
+    correct_predictions = top_k_indices.eq(target_expanded)
+    correct = correct_predictions.any(dim=1)
+    accuracy = correct.float().mean()
+    return accuracy.item()
+```
+
+The function retrieves the top k predictions' indices, aligns shapes for comparison with true labels, computes accuracy by checking matches, and returns the average accuracy as a float.
+
+[Tests]
+```python
+# Test 1: Basic functionality test
+k = 1
+labels = torch.tensor([2, 0, 1, 1])
+preds = torch.tensor([
+    [0.1, 0.2, 0.9], # yes
+    [1.0, 0.2, 0.3], # yes
+    [0.3, 1.1, 0.2], # yes
+    [0.6, 0.1, 0.3], # no
+])
+accuracy = calculate_top_k_accuracy(preds, labels, k)
+assert accuracy == 0.75
+
+# Test 2: Edge case with k = number of classes
+k = 3
+preds = torch.tensor([
+    [0.5, -1.2, 0.3], # yes
+    [-1.0, 0.1, 1.2], # yes
+])
+labels = torch.tensor([0, 2])
+accuracy = calculate_top_k_accuracy(preds, labels, k)
+assert accuracy == 1.0
+
+# Test 3: k greater than the number of classes should still work
+preds = torch.tensor([
+    [0.1, -0.2], # yes
+    [-0.3, 0.4], # yes
+])
+labels = torch.tensor([1, 0])
+accuracy = calculate_top_k_accuracy(preds, labels, k=5)
+assert accuracy == 1.0
+```
+
+### Example 14
+[Code]
+def alternatingCharacters(s):
+    i = 0
+    j = 1
+    count = 0
+    while j<len(s):
+        if s[j] == s[i]:
+            while j<len(s) and s[j] == s[i]:
+                j+=1
+            count += j-i-1
+        i = j
+        j += 1
+    return count
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: 2-pointer technique, conditional loop, string traversal and character comparison, count accumulation
+
+[Instruction]
+Write a Python function called `count_conditional_matches` that takes two strings, `str1` and `str2`, as well as a boolean flag `strict` as arguments. The function should count how many times characters from the end of `str1` match with characters from the beginning of `str2` when both strings are traversed simultaneously. The traversal should continue until a pair of characters do not match or until a specific condition influenced by the `strict` flag is met:
+
+- If `strict` is `True`, stop counting as soon as a non-matching pair is found.
+- If `strict` is `False`, skip the non-matching character in `str1` and continue matching with the next character.
+
+The function should return the total count of matching characters. This implementation requires managing two pointers for the characters in `str1` and `str2`, respectively, and using a conditional loop to handle different stopping criteria based on the `strict` parameter.
+
+[Response]
+We can use two pointers, one for each string, to iterate over the characters from the end of str1 and the beginning of str2. The loop continues either until the characters do not match (for both strict and non-strict cases) or until it exhausts one of the strings. The `strict` flag controls the behavior when a mismatch is encountered.
+
+```python
+def count_conditional_matches(str1, str2, strict):
+    # Initialize pointers for the end of str1 and the start of str2
+    i, j = len(str1) - 1, 0
+    count = 0
+
+    # Loop as long as i is non-negative and j is less than the length of str2
+    while i >= 0 and j < len(str2):
+        if str1[i] == str2[j]:
+            count += 1
+            i -= 1
+            j += 1
+        elif strict:
+            break
+        else:
+            i -= 1
+    return count
+```
+
+[Tests]
+The function can be tested with various inputs to ensure it handles both strict and non-strict cases correctly:
+
+```python
+# Test function with matching characters
+assert count_conditional_matches("hello", "o", True) == 1
+assert count_conditional_matches("fancy", "nancy", False) == 2
+assert count_conditional_matches("abcde", "e", False) == 1
+assert count_conditional_matches("helicopter", "ranges", True) == 1
+
+# Test function with no matches
+assert count_conditional_matches("apple", "banana", True) == 0
+assert count_conditional_matches("abcdef", "xyzab", False) == 0
+
+# Test when both strings are empty
+assert count_conditional_matches("", "", True) == 0
+assert count_conditional_matches("", "", False) == 0
+
+# Test when one string is empty
+assert count_conditional_matches("nonempty", "", True) == 0
+assert count_conditional_matches("", "nonempty", False) == 0
+```
+
+### Example 15
+[Code]
+def oxford_comma_text_to_list(phrase):
+    """Examples:
+    - 'Eeeny, Meeny, Miney, and Moe' --> ['Eeeny', 'Meeny', 'Miney', 'Moe']
+    - 'Black and White' --> ['Black', 'White']
+    - 'San Francisco and Saint Francis' -->
+        ['San Francisco', 'Saint Francisco']
+    """
+    items = []
+    for subphrase in phrase.split(', '):
+        items.extend(
+            [item.strip() for item in subphrase.split(' and ')])
+    return items
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: string manipulation and parsing, list comprehension, iterative list extension, handling text connectors
+
+[Instruction]
+Create a concise Python function that transforms a string into a list of individual items. The input string contains a list of items separated by commas and the last item preceded by an optional "and". For example:
+- Input: "Eeeny, Meeny, Miney, Moe" --> Output: ['Eeeny', 'Meeny', 'Miney', 'Moe']
+- Input: "Eeeny, Meeny, Miney, and Moe" --> Output: ['Eeeny', 'Meeny', 'Miney', 'Moe']
+- Input: "San Francisco and San Mateo" --> Output: ['San Francisco', 'San Mateo']
+Remove any leading or trailing whitespace.
+
+[Response]
+Here's a concise function `string_to_list` to transform a comma-separated string into a list, replacing " and " with a comma, splitting the result, and stripping whitespace:
+
+```python
+def string_to_list(s):
+    return [item.strip() for item in s.replace(" and ", ",").split(",") if item.strip() != ""]
+```
+
+This approach ensures no empty strings are included if there are excess commas or spaces.
+
+[Tests]
+We can test this function on different input strings (e.g., with and without the "and" connector, different numbers of items):
+
+```python
+assert string_to_list("Eeeny, Meeny, Miney, Moe") == ['Eeeny', 'Meeny', 'Miney', 'Moe']
+assert string_to_list("Eeeny, Meeny, Miney, and Moe") == ['Eeeny', 'Meeny', 'Miney', 'Moe']
+assert string_to_list("San Francisco and San Mateo") == ['San Francisco', 'San Mateo']
+assert string_to_list("Single Item") == ['Single Item']
+```
+
+### Example 16
+[Code]
+def get_hashes(buf):
+    hexdigests = namedtuple('Digests', 'md5 sha1 sha256 sha512 ctph')
+    if isinstance(buf, str):
+        buf = open(buf, 'rb').read()
+    md5 = hashlib.md5(buf).hexdigest()
+    sha1 = hashlib.sha1(buf).hexdigest()
+    sha256 = hashlib.sha256(buf).hexdigest()
+    sha512 = hashlib.sha512(buf).hexdigest()
+    ctph = ssdeep.hash(buf)
+    return hexdigests._make((md5, sha1, sha256, sha512, ctph))
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: binary string hash computation, file content reading, string hashing, named tuples, conditional file content reading
+
+[Instruction]
+Implement a Python function that computes different types of hash values for the binary content of a file whose path is defined by an input string. You should calculate 'md5', 'sha1', 'sha256', and 'sha512' and return a `namedtuple` of these fields. When the input string does not correspond to a file, the function should directly compute the hash values of path itself.
+
+[Response]
+To compute the hashes of a file or a string, we'll follow these steps:
+
+1. If the input is a valid file path, read the binary content of the file.
+2. Otherwise, convert the input string to a binary string.
+3. Compute hash values of all types using the `hashlib` module.
+4. Return the hash values as a `namedtuple` for easy access.
+
+Here's how you can implement this function:
+
+```python
+import hashlib
+from collections import namedtuple
+from pathlib import Path
+
+HashValues = namedtuple('HashValues', ['md5', 'sha1', 'sha256', 'sha512'])
+
+def compute_hashes(file_path):
+    try:
+        with open(file_path, 'rb') as f:
+            content = f.read()
+    # Handle cases where the file does not exist or the path is a directory
+    except (FileNotFoundError, IsADirectoryError):
+        content = file_path.encode()
+
+    md5_hash = hashlib.md5(content).hexdigest()
+    sha1_hash = hashlib.sha1(content).hexdigest()
+    sha256_hash = hashlib.sha256(content).hexdigest()
+    sha512_hash = hashlib.sha512(content).hexdigest()
+
+    return HashValues(md5_hash, sha1_hash, sha256_hash, sha512_hash)
+```
+
+[Tests]
+To test the function, you can provide string inputs to avoid file I/O operations and verify that the hash values are correctly computed:
+
+```python
+string = 'random string'
+binary = string.encode()
+computed_hashes = compute_hashes(string)
+assert computed_hashes.md5 == hashlib.md5(binary).hexdigest()
+assert computed_hashes.sha1 == hashlib.sha1(binary).hexdigest()
+assert computed_hashes.sha256 == hashlib.sha256(binary).hexdigest()
+assert computed_hashes.sha512 == hashlib.sha512(binary).hexdigest()
+```
+
+### Example 17
+[Code]
+from collections import Counter
+
+class Solution:
+    def sumOfUnique(self, nums: List[int]) -> int:
+        return sum(k for k, v in Counter(nums).items() if v == 1)
+
+[Property]
+category: function implementation
+language: Python
+difficulty: easy
+concepts: dictionary-based counting, filtering unique elements with list comprehension, summation of elements based on condition
+
+[Instruction]
+Write a Python function that takes a list from user input and prints the sum of counts for elements that occur more than once. Use a dictionary to count frequencies efficiently. Utilize a list comprehension to extract repeated elements based on the frequency counts, and sum their corresponding counts from the dictionary.
+
+[Response]
+To implement this function, we first need to parse the user input as a list of integers and then count the frequency of each element using a dictionary. We can then calculate the sum of the counts for elements that occur more than once.
+
+Here's a Python function that accomplishes this:
+
+```python
+def sum_repeated_counts():
+    nums = list(map(int, input().split()))
+    freq_dict = {}
+    for num in nums:
+        freq_dict[num] = freq_dict.get(num, 0) + 1
+    sum_of_repeats = sum(v for k, v in freq_dict.items() if v > 1)
+    print(sum_of_repeats)
+```
+
+[Tests]
+We can test this program with I/O redirection to simulate user input and output. Here is an example:
+
+```python
+import sys
+from io import StringIO
+
+test_cases = [
+    ("1 2 2 3 3 3\n", "5\n"),
+    ("1 1 1 1 1\n", "5\n"),
+    ("1 2 3 4 5\n", "0\n"),
+    ("\n", "0\n")
+]
+
+for input_data, expected_output in test_cases:
+    stdin, stdout = sys.stdin, sys.stdout
+    sys.stdin = StringIO(input_data)
+    sys.stdout = StringIO()
+    sum_repeated_counts()
+    output = sys.stdout.getvalue()
+    assert output == expected_output
+```
+
+### Example 18
+
+[Code]
+fp=open('cmd.sh','r')
+lines=fp.readlines()
+for i,line in enumerate(lines):
+    cmd=line.replace('\n','')
+    print i,cmd
+    p=os.popen(cmd)
+    x=p.read()
+    p.close()
+fp.close
+
+[Property]
+category: program implementation
+language: Python
+difficulty: medium
+concepts: iterating over file lines, command execution from file input, new line character removal
+
+[Instruction]
+Develop a Python program that reads a text file containing one shell command per line and executes these commands sequentially. Each command should be sanitized by removing unnecessary newline characters before execution. Provide clear error handling and logging to manage exceptions that might occur during the execution of the commands.
+
+[Response]
+To create a Python program that reads and executes shell commands from a text file, we can use Python’s built-in module `subprocess` for running the commands and `logging` for handling logs and errors. The program will involve reading and sanitizing the commands from a file, executing them sequentially, and logging the results or errors.
+
+Below is the Python script that demonstrates this:
+
+```python
+import subprocess
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+
+def read_commands(file_path):
+    """Reads a text file and returns a list of commands."""
+    try:
+        with open(file_path, 'r') as file:
+            commands = file.readlines()
+        commands = [cmd.strip() for cmd in commands]  # Remove newline characters and spaces
+        return commands
+    except FileNotFoundError:
+        logging.error(f"The file {file_path} was not found.")
+        raise
+    except Exception as e:
+        logging.error(f"An error occurred while reading the file: {str(e)}")
+        raise
+
+def execute_command(command):
+    """Executes a single shell command."""
+    try:
+        logging.info(f"Executing command: {command}")
+        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        logging.info(f"Command output: {result.stdout.decode().strip()}")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error executing command '{command}': {e.stderr.decode()}")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {str(e)}")
+
+def main(file_path):
+    """Main function to read commands from a file and execute them."""
+    commands = read_commands(file_path)
+    for command in commands:
+        execute_command(command)
+```
+
+[Tests]
+To test this program, we can use Python's `unittest` framework along with `mock_open` to simulate file operations, `patch` to mock `subprocess.run` for testing command execution, and `assertLogs` to verify the logging output. Here's an example of how you can write tests for this program:
+
+```python
+import unittest
+from unittest.mock import mock_open, patch, MagicMock
+
+class TestCommandExecutor(unittest.TestCase):
+    def test_read_commands_success(self):
+        m = mock_open(read_data="ls\npwd\n")
+        with patch('builtins.open', m):
+            result = read_commands("dummy_path")
+            self.assertEqual(result, ['ls', 'pwd'])
+
+    def test_read_commands_file_not_found(self):
+        with patch('builtins.open', mock_open()) as mocked_file:
+            mocked_file.side_effect = FileNotFoundError
+            with self.assertRaises(FileNotFoundError):
+                read_commands("nonexistent_path")
+
+    @patch('subprocess.run')
+    def test_execute_command_success(self, mock_run):
+        mock_run.return_value = MagicMock(stdout=b"Execution successful", stderr=b"")
+        execute_command("ls")
+        mock_run.assert_called_once_with("ls", shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    @patch('subprocess.run')
+    def test_execute_command_failure(self, mock_run):
+        error_message = b"Command failed"
+        mock_run.side_effect = subprocess.CalledProcessError(1, 'ls', stderr=error_message)
+        with self.assertLogs(level='ERROR') as log:
+            execute_command("ls")
+            self.assertIn("Error executing command 'ls'", log.output[0])
+            self.assertIn("Command failed", log.output[0])
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+### Example 19
+[Code]
+def busca_linear_recursiva(array,elemento):
+    i = -1
+    return busca_recursiva(array,elemento, i)
+
+def busca_recursiva(array,elemento, i):
+    i += 1
+    if(i == len(array)):
+       return -1
+    if(array[i] == elemento):
+        return i
+    return busca_recursiva(array,elemento,i)
+
+[Property]
+category: program implementation
+language: Python
+difficulty: medium
+concepts: linear search with recursion, default parameter initialization, multiple base cases in recursion
+
+[Instruction]
+Design a Python program that not only searches for a target value in a list using recursion but also constructs a trace of the indices it checks. This program should return both the index of the target, if found, or `-1` if not, alongside a list of the indices it examined during the search. The function should handle cases where the target is not present in the list.
+
+[Response]
+We can implement a recursive linear search function that returns the index of the target element if found or `-1` if not. To keep track of the indices examined during the search, we can pass a list as an additional parameter to store these indices.
+
+Here is the Python program that implements this functionality:
+
+```python
+def search_recursive(arr, target, index, indices_checked):
+    """Recursive function to search for the target value in the list."""
+    if index >= len(arr):
+        return -1
+    indices_checked.append(index)
+    if arr[index] == target:
+        return index
+    return search_recursive(arr, target, index + 1, indices_checked)
+
+def recursive_search(arr, target):
+    """Wrapper function to initiate recursive search."""
+    indices_checked = []
+    result = search_recursive(arr, target, 0, indices_checked)
+    return result, indices_checked
+
+# Example usage
+if __name__ == "__main__":
+    array = [2, 3, 4, 8, 5, 9, 1, 6, 5, 7, 5]
+    target = 6
+    result, indices = recursive_search(array, target)
+    print(f"Target {target} found at index {result} with indices checked: {indices}")
+```
+
+In this program, the `search_recursive` function recursively searches for the target element in the list and appends the indices checked to the `indices_checked` list. The `recursive_search` function acts as a wrapper to initiate the recursive search and return the result along with the list of indices checked.
+
+[Tests]
+To test the implementation, we need to ensure that both the index of the target element and the list of indices checked are correct. Here are the test cases:
+
+```python
+# Test case 1: Target found in the list
+arr1 = [2, 3, 4, 8, 5, 9, 1, 6, 5, 7, 5]
+target1 = 6
+expected_result1 = arr1.index(target1)
+expected_indices1 = list(range(expected_result1 + 1))
+result1, indices_checked1 = recursive_search(arr1, target1)
+assert result1 == expected_result1
+assert indices_checked1 == expected_indices1
+
+# Test case 2: Target not found in the list
+arr2 = [1, 2, 3, 4, 5]
+target2 = 6
+expected_result2 = -1
+expected_indices2 = list(range(len(arr2)))
+result2, indices_checked2 = recursive_search(arr2, target2)
+assert result2 == expected_result2
+assert indices_checked2 == expected_indices2
+
+# Test case 3: Target found at the end of the list
+arr3 = [5, 4, 3, 2, 1]
+target3 = 1
+expected_result3 = len(arr3) - 1
+expected_indices3 = list(range(expected_result3 + 1))
+result3, indices_checked3 = recursive_search(arr3, target3)
+assert result3 == expected_result3
+assert indices_checked3 == expected_indices3
+```
+
+### Example 20
+[Code]
+Data = np.zeros([break_points[-1],size_blocks])
+Data_stacked = np.zeros([break_points[-1]-num_blocks+1, size_blocks*num_blocks])
+cluster_point_list = []
+for counter in xrange(len(break_points)):
+        break_pt = break_points[counter]
+        cluster = seg_ids[counter]
+        if counter == 0:
+                old_break_pt = 0
+        else:
+                old_break_pt = break_points[counter-1]
+        for num in xrange(old_break_pt,break_pt):
+                ##generate the point from this cluster
+                # print "num is:", num
+                if num == 0:
+
+[Property]
+category: program implementation
+language: Python
+difficulty: medium
+concepts: NumPy array initialization, iteration over break points, cluster segmentation, nested loops
+
+[Instruction]
+Implement a Python program that initializes a NumPy array randomly (0--1) and segments it into clusters based on provided breakpoints. Each cluster is defined by consecutive elements between two breakpoints. The output should be a list of NumPy arrays representing these clusters.
+
+For example, given a size 10 and breakpoints `[3, 6, 8]`, the program should first initialize a NumPy array of 10 random elements between 0 and 1 and then output three clusters: elements at indices `0-2`, `3-5`, `6-7`, and `8-9`. Ensure that the program handles cases where breakpoints are at the boundaries of the array or if there are no breakpoints, in which case the entire array should be a single cluster. Include error handling to manage invalid inputs such as negative array sizes or breakpoints that are out of range.
+
+[Response]
+Here is the program that achieves what you've described:
+
+```python
+import numpy as np
+
+def segment_array(data, break_points):
+    """Segment the given array into clusters based on specified breakpoints."""
+    break_points = [0] + break_points + [len(data)]
+    segmented_arrays = []
+    for i in range(len(break_points) - 1):
+        start_index = break_points[i]
+        end_index = break_points[i + 1]
+        segmented_arrays.append(data[start_index:end_index])
+    return segmented_arrays
+
+def create_clusters(size, break_points):
+    """Generate and segment a random array of given size using breakpoints."""
+    if size <= 0:
+        raise ValueError("Array size must be positive.")
+    data = np.random.rand(size)
+    clusters = segment_array(data, break_points)
+    return clusters
+
+# Example usage
+if __name__ == "__main__":
+    size = 10
+    break_points = [3, 6, 8]
+    clusters = create_clusters(size, break_points)
+    for i, cluster in enumerate(clusters):
+        print(f"Cluster {i}: {cluster}")
+```
+
+In this implementation, `segment_array` transforms the input data array into a list of NumPy arrays based on the provided breakpoints. The `main` function initializes a random NumPy array of a specified size and calls `segment_array` to segment the array into clusters based on the breakpoints.
+
+[Tests]
+To test the program, we can verify that the values in each cluster are within the expected range (0--1) and that the clusters are correctly segmented. Here are some test cases:
+
+```python
+def test_segmentation(size, break_points):
+    clusters = create_clusters(size, break_points)
+    for cluster in clusters:
+        assert np.all(cluster >= 0) and np.all(cluster <= 1)
+    break_points = [0] + break_points + [size]
+    for i in range(len(break_points) - 1):
+        assert len(clusters[i]) == break_points[i + 1] - break_points[i]
+
+# Test cases
+test_cases = [
+    (20, [5, 10, 15]),
+    (10, [3, 6, 8]),
+    (15, [3, 6, 12]),
+    (30, [7, 14, 21, 27]),
+    (5, [1]),
+    (10, []),
+    (50, [10, 20, 30, 40]),
+]
+
+for size, breakpoints in test_cases:
+    test_segmentation(size, breakpoints)
+```
+
+### Example 21
+[Code]
+if match_case == 'auto':
+    if len(set([ch_name.lower() for ch_name in ch_names])) < len(set(ch_names)):
+        match_case = True
+    else:
+        match_case = False
+
+if match_case:
+    picks = mne.pick_channels(ch_names, pick_chs, ordered=ordered)
+else:
+    ch_names = [ch_name.lower() for ch_name in ch_names]
+    pick_chs = [pick_ch.lower() for pick_ch in pick_chs]
+    picks = mne.pick_channels(ch_names, pick_chs, ordered=ordered)
+
+return picks
+
+[Property]
+category: program implementation
+language: Python
+difficulty: medium
+concepts: case-insensitive string matching, controlled case matching based on an option, list comprehension
+
+[Instruction]
+Construct a Python program that processes a list of strings provided by the user. The first element is a target string, the second is either 'CaseSensitive' or 'CaseInsensitive' to determine the matching approach, and the remaining elements are candidates for comparison. The program should output the number of times the target appears among the candidates according to the specified matching rule. The solution should include robust error handling to validate the matching rule and check that at least two strings are provided before proceeding.
+
+For example, given the input `['apple', 'CaseInsensitive', 'Apple', 'banana', 'APPLE']`, the program should output `2` since 'Apple' and 'APPLE' match the target 'apple' in a case-insensitive manner.
+
+[Response]
+Here's a Python program that fulfills the requirements you specified. It first parses the input list to validate the presence of the target string and matching rule. Then, it compares the target with the candidate strings, adjusting for case sensitivity as specified. Finally, it outputs the count of matches.
+
+```python
+def count_matches(input_list):
+    if not input_list or len(input_list) < 2:
+        raise ValueError("Input list must contain at least two items: the target string and the matching rule.")
+
+    target_string, matching_rule = input_list[0], input_list[1]
+    if matching_rule not in ['CaseSensitive', 'CaseInsensitive']:
+        raise ValueError("Matching rule must be either 'CaseSensitive' or 'CaseInsensitive'.")
+
+    candidates = input_list[2:]
+    if matching_rule == 'CaseSensitive':
+        match_count = sum(1 for candidate in candidates if candidate == target_string)
+    else:
+        target_string = target_string.lower()
+        match_count = sum(1 for candidate in candidates if candidate.lower() == target_string)
+
+    return match_count
+
+def main():
+    input_list = input().split()
+    print(count_matches(input_list))
+
+if __name__ == "__main__":
+    main()
+```
+
+The `count_matches` function implements the main logic of the program, counting the occurrences of the target string among the candidate strings based on the specified matching rule. The `main` function reads the input list from the user, calls `count_matches`, and prints the count of matches.
+
+[Tests]
+You can test the program with various inputs to ensure it handles different scenarios correctly:
+
+```python
+assert count_matches(['apple', 'CaseInsensitive', 'Apple', 'banana', 'APPLE']) == 2
+assert count_matches(['apple', 'CaseSensitive', 'Apple', 'banana', 'APPLE']) == 0
+assert count_matches(['apple', 'CaseInsensitive']) == 0
+assert count_matches(['apple', 'CaseInsensitive', 'apple', 'APPLE', 'aPpLe', 'banana']) == 3
+assert count_matches(['apple', 'CaseSensitive', 'apple', 'APPLE', 'aPpLe', 'banana']) == 1
+
+try:
+    count_matches(['apple'])
+    assert False
+except ValueError as e:
+    assert str(e) == "Input list must contain at least two items: the target string and the matching rule."
+
+try:
+    count_matches(['apple', 'InvalidRule', 'Apple'])
+    assert False
+except ValueError as e:
+    assert str(e) == "Matching rule must be either 'CaseSensitive' or 'CaseInsensitive'."
+```

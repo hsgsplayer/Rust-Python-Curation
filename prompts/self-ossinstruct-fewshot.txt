@@ -1,0 +1,2125 @@
+### System: I->R
+You are an extremely intelligent AI coding assistant. Please provide an accurate and reliable response to each user instruction. After delivering your response, verify its consistency and correctness by writing a series of executable tests.
+
+### System: C->I
+Create a series of independent coding tasks that are original, distinct, diverse, and high-quality, fostering logical thinking. Each task must adhere to specified properties:
+
+- category: the type of task (e.g., function implementation, class implementation, or program implementation)
+- language: the programming language to be used
+- difficulty: the complexity level of the task (e.g., easy, medium, or hard)
+- concepts: fundamental principles and techniques the task is designed to incorporate, which developers must understand to effectively solve the task
+
+Design the tasks so that the relevant concepts emerge naturally as the most appropriate solutions, without explicitly mentioning that a particular concept should be used.
+
+### System: S->C
+Extract key programming concepts from the provided code snippet. Programming concepts refer to the foundational principles and techniques used in programming, which are crucial for developers to master. List these concepts in a comma-separated format.
+
+### System: S->I
+Gain inspiration from the given code snippets and create a series of independent coding tasks that are original, distinct, diverse, and high-quality, fostering logical thinking.
+
+### Example 1
+[Code]
+    value = int(round((value - prev) * 1e5))
+    value = ~(value << 1) if value < 0 else (value << 1)
+    chunks = _split_into_chunks(value)
+    return (chr(chunk + 63) for chunk in chunks)
+def _split_into_chunks(value):
+    while value >= 32:  # 2^5, while there are at least 5 bits
+        # first & with 2^5-1, zeros out all the bits other than the first five
+        # then OR with 0x20 if another bit chunk follows
+        yield (value & 31) | 0x20
+        value >>= 5
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: medium
+concepts: 5-bit chunk encoding with bitwise shifts, ASCII value manipulation, continuation bit signaling
+
+[Instruction]
+Create a Rust function to encode an integer into a sequence of encoded characters, where each character represents a 5-bit chunk of the integer. The ASCII value of each chunk character is formed by adding 63 to the 5-bit chunk's value. For all chunks except the last one, set the 6th bit to 1 to indicate continuation. Employ bitwise operations for this encoding process.
+
+[Response]
+To encode an integer into a sequence of encoded characters based on the specified criteria, let's follow these steps:
+
+1. Break down the integer into 5-bit chunks: Extract 5-bit chunks from the integer using using `& 31` (`0x1F`), because the binary representation of `31` (`11111`) has the last five bits set, which will effectively extract the 5 bits we are interested in. We start from the least significant bits (LSB).
+2. Set continuation bit: For all chunks except the last one, set the 6th bit to 1 using `| 32` (`0x20`) because the binary representation of `32` (`100000`) has the 6th bit set to 1. This indicates that there's another continuation chunk following.
+3. Shift right: Right-shift the value by 5 to process the next 5 bits.
+4. Convert to characters: Use `ord` and `chr` to convert each chunk (now effectively 6 bits due to the continuation bit) into a character by adding 63 to its value. This ensures that the character is within a printable ASCII range.
+5. Assembly: Assemble these characters into the final encoded string while maintaining the order of the chunks through `reversed`.
+
+Here's how you can implement this function:
+
+```rust
+fn encode_integer_to_chars(mut value: i64) -> String {
+    if value == 0 {
+        return std::char::from_u32(63).unwrap().to_string();
+    }
+
+    let mut encoded_chars = Vec::new();
+    
+    while value > 0 {
+        let mut chunk = (value & 31) + 63;
+        value >>= 5;
+        
+        if value > 0 {
+            chunk |= 32;
+        }
+        
+        encoded_chars.push(std::char::from_u32(chunk as u32).unwrap());
+    }
+    
+    encoded_chars.reverse();
+    encoded_chars.into_iter().collect()
+}
+```
+
+Keep in mind that this function is designed for non-negative integers. In Rust, right-shifting (`>>`) a negative integer preserves the sign bit, which could lead to infinite loops or other incorrect behaviors if the same encoding approach is applied to negative integers without appropriate adjustments.
+
+[Tests]
+You can validate this function with the following test cases that cover scenarios from zero to a number requiring more than one chunk, ensuring the function operates as expected:
+
+```rust
+assert encode_integer_to_chars(0) == chr(63)
+assert encode_integer_to_chars(1) == chr(63 + 1)
+assert encode_integer_to_chars(31) == chr(63 + 31)
+assert encode_integer_to_chars(int(0b1)) == chr(0b1 + 63)
+assert encode_integer_to_chars(int(0b1000001)) == chr(0b10 + 63) + chr(63 + 0b100001)
+```
+
+### Example 2
+[Code]
+/// Returns ceil(n / 2^b) without performing any floating-point or division operations.
+/// This is done by right-shifting n by b bits and incrementing the result by 1
+/// if any '1' bits were shifted out.
+pub fn ceil_shift(n: i64, b: i32) -> Result<i64, UnsupportedOperandError> {
+    // Check for negative values
+    if n < 0 || b < 0 {
+        return Err(UnsupportedOperandError);
+    }
+    
+    let mask = (1_i64 << b) - 1;
+    
+    Ok(if n & mask != 0 {
+        (n >> b) + 1
+    } else {
+        n >> b
+    })
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: medium
+concepts: bitwise operation for division, ceiling without division or float, input validation with assertions, non-negative integer checks
+
+[Instruction]
+Develop a Rust function `ceil_divide_without_div` that computes the ceiling of `n / 2**b` without using division, floating-point operations, built-in functions like `math.ceil`, or converting it into computing the floor. Instead, use bit manipulation to achieve the result. You write assertions to ensure both `n` and `b` are non-negative integers.
+
+[Response]
+We can leverage the properties of bitwise operations to develop a Rust function that computes the ceiling of `n / 2**b` without using division, floating-point operations, or any built-in functions like `math.ceil`, and strictly avoiding converting the problem into a floor computation.
+
+In the context, dividing by `2**b` is equivalent to right-shifting `n` by `b` bits in binary representation when `n` is divisible by `2**b`. Otherwise, this approach inherently computes the floor of the division. To adjust for the ceiling without directly calculating it, we can consider two cases:
+
+1. If `n` is divisible by `2**b`, the result of the division is simply the value of right-shifting `n` by `b` bits.
+2. Otherwise, we need to increment the right-shifted result by 1 to achieve the ceiling effect.
+
+To determine the divisibility of `n` by `2**b`, we can check if the first `b` bits of `n` are all 0. This can be done using a mask with the first `b` bits set to 1, and then performing a bitwise AND operation with `n`. If the result is 0, it indicates that `n` is divisible by `2**b`. The mask can be created using `mask = (1 << b) - 1`.
+
+We'll also include assertions to ensure that `n` and `b` are non-negative integers.
+
+Here is the implementation of `ceil_divide_without_div`:
+
+```rust
+fn ceil_divide_without_div(n: i64, b: i32) -> i64 {
+    assert!(n >= 0, "n must be a non-negative integer");
+    assert!(b >= 0, "b must be a non-negative integer");
+
+    let mask = (1_i64 << b) - 1;
+    let divisible = (n & mask) == 0;
+    let mut result = n >> b;
+    if !divisible {
+        result += 1;
+    }
+    result
+}
+```
+
+This function calculates the ceiling of `n / 2**b` purely through bitwise manipulation and integer arithmetic. The assertions ensure the input constraints are met, as specified.
+
+[Tests]
+To verify the correctness of the function, we can compare the results of our function with the expected results obtained using `math.ceil` to ensure the correctness of the ceiling division operation:
+
+```rust
+assert_eq!(ceil_divide_without_div(10, 3), ((10 as f64) / (1_i64 << 3) as f64).ceil() as i64);
+assert_eq!(ceil_divide_without_div(17, 4), ((17 as f64) / (1_i64 << 4) as f64).ceil() as i64);
+assert_eq!(ceil_divide_without_div(100, 5), ((100 as f64) / (1_i64 << 5) as f64).ceil() as i64);
+assert_eq!(ceil_divide_without_div(0, 3), ((0 as f64) / (1_i64 << 3) as f64).ceil() as i64);
+assert_eq!(ceil_divide_without_div(1, 0), ((1 as f64) / (1_i64 << 0) as f64).ceil() as i64);
+```
+
+### Example 3
+[Code]
+fn is_prime(n: i64, prime_list: &Vec<i64>, prime_dict: &mut HashMap<i64, i32>) -> i32 {
+    let isprime = if n >= 2 { 1 } else { 0 };
+    for &prime in prime_list {
+        if prime * prime > n { break; }
+        if n % prime == 0 {
+            return 0;
+        }
+    }
+    if isprime == 1 {
+        prime_dict.insert(n, 1);
+    }
+    isprime
+}
+
+fn prime(x: usize, prime_list: &mut Vec<i64>) -> i64 {
+    let mut lastn = prime_list[prime_list.len() - 1];
+    while prime_list.len() <= x {
+        lastn = lastn + 1;
+    }
+    lastn
+}
+
+[Property]
+category: class implementation
+language: Rust
+difficulty: medium
+concepts: prime number memoization, n-th prime calculation, efficiency in prime checks
+
+[Instruction]
+Implement a Rust class with a method `find_nth_prime_memoized(n)` that returns the nth prime number, where n is a positive integer. Utilize memoization to store already found prime numbers in a list within the class to avoid recalculating primes for multiple method calls. Ensure the method efficiently updates and references this list to find new primes as needed. Additionally, enhance performance by avoiding unnecessary prime checks.
+
+[Response]
+Implementing the required Rust class with the method `find_nth_prime_memoized(n)` involves several key steps:
+
+1. The class should have a constructor `__init__` that initializes the cache list to store the memoized prime numbers. Initially, the list can be seeded with the first two prime numbers, 2 and 3.
+2. The method `find_nth_prime_memoized` will check if the requested `n`th prime is already in the memoized list. If it is, it will return that prime directly. If not, it will start from the last cached prime and continue to find and cache new primes until the `n`th prime is found.
+3. A helper method `is_prime` can be defined to check if a number is prime. To efficiently check for primality:
+    - It checks if the number is divisible by each of the primes already in the cache.
+    - It only checks up to the square root of the number to be tested, implemented by comparing the square of the prime with the number.
+    - It skips even numbers by incrementing by 2 for each prime check. This is sound since the cache is initialized with the first **two** primes, 2 and 3.
+
+Here is how you could implement such a class:
+
+```rust
+struct PrimeFinder {
+    primes: Vec<i64>
+}
+
+impl PrimeFinder {
+    fn new() -> Self {
+        PrimeFinder {
+            primes: vec![2, 3]
+        }
+    }
+
+    fn is_prime(&self, num: i64) -> bool {
+        if num < 2 {
+            return false;
+        }
+        for &prime in &self.primes {
+            if prime * prime > num {
+                break;
+            }
+            if num % prime == 0 {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn find_nth_prime_memoized(&mut self, n: usize) -> i64 {
+        if n <= self.primes.len() {
+            return self.primes[n - 1];
+        }
+
+        let mut current_num = self.primes[self.primes.len() - 1] + 2;
+        while self.primes.len() < n {
+            if self.is_prime(current_num) {
+                self.primes.push(current_num);
+            }
+            current_num += 2;
+        }
+
+        self.primes[n - 1]
+    }
+}
+```
+
+[Tests]
+Here's how you can test this class by verifying that the class correctly finds the first few primes and that subsequent calls return the memoized results directly:
+
+```rust
+let first_few_primes = vec![2, 3, 5, 7, 11, 13, 17, 19, 23, 29];
+let mut prime_finder = PrimeFinder::new();
+    
+for (i, &prime) in first_few_primes.iter().enumerate() {
+    assert_eq!(prime_finder.find_nth_prime_memoized(i + 1), prime);
+}
+
+for (i, &prime) in first_few_primes.iter().enumerate() {
+    assert_eq!(prime_finder.find_nth_prime_memoized(i + 1), prime);
+}
+```
+
+### Example 4
+[Code]
+    (a + 1) * (b + 1) - 1
+}
+
+fn keys_count(a: i64, b: i64) -> i64 {
+    powerset(a, b) * 2 - a - b
+}
+
+fn formula(k: i64) -> f64 {
+    if k % 2 != 0 {
+        ((k + 1) as f64).powi(2) / 2.0 + (k as f64) + 1.0
+    } else {
+        (k as f64).powi(2) / 2.0 + 2.0 * (k as f64) + 1.0
+    }
+}
+
+fn multiset_powerset(multiset: &mut Vec<i32>) {
+    let n = multiset.len();
+    let mut c = vec![0; n];
+    loop {
+        let mut changed = false;
+        let mut i = n - 1;
+        while i >= 0 && !changed {
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: special formula implementation, odd and even number handling, function composition
+
+[Instruction]
+Here are two special formulas:
+
+$$
+f_1(a, b) = (a + 1) \cdot (b + 1) - 1
+$$
+
+$$
+f_2(k) = \begin{cases}
+    \frac{(k + 1)^2}{2} + k + 1 & \text{if } k \text{ is odd} \\
+    \frac{k^2}{2} + 2k + 1 & \text{if } k \text{ is even}
+\end{cases}
+$$
+
+Write a Rust function to return $f_2(f_1(a, b))$ for given `a` and `b`.
+
+[Response]
+Based on the formulas you provided, we can define two Rust functions, `f1(a, b)` and `f2(k)`, respectively, and then combine them to calculate $f2(f1(a, b))$ for given `a` and `b`.
+
+Here is the implementation:
+
+```rust
+fn f1(a: i64, b: i64) -> i64 {
+    (a + 1) * (b + 1) - 1
+}
+
+fn f2(k: i64) -> f64 {
+    if k % 2 == 0 {
+        (k.pow(2) as f64) / 2.0 + 2.0 * (k as f64) + 1.0
+    } else {
+        ((k + 1).pow(2) as f64) / 2.0 + (k as f64) + 1.0
+    }
+}
+
+fn f1_f2_combined(a: i64, b: i64) -> f64 {
+    f2(f1(a, b))
+}
+```
+
+In this implementation:
+
+- `f1(a, b)` calculates the first formula you've given.
+- `f2(k)` calculates the second formula, with a conditional branch for whether `k` is even or odd.
+- `f1_f2_combined(a, b)` uses the output of `f1(a, b)` as the input for `f2(k)` and returns the result.
+
+[Tests]
+To test this combined function, you can simply compare it with the direct application of `f2` to the result of `f1` for different values of `a` and `b`:
+
+```rust
+assert_eq!(f1_f2_combined(2, 3), f2(f1(2, 3)));
+assert_eq!(f1_f2_combined(4, 5), f2(f1(4, 5)));
+assert_eq!(f1_f2_combined(6, 7), f2(f1(6, 7)));
+```
+
+### Example 5
+[Code]
+    while left < arr.len() && ryt >= start && left <= ryt {
+        let mid = (left + ryt) / 2;
+        if arr[mid] == target {
+            return mid;
+        } else if arr[mid] > target {
+            ryt = mid - 1;
+        } else {
+            left = mid + 1;
+        }
+    }
+    left
+}
+
+fn triplets_sorting(nums: &mut [i32], t: i32) -> i32 {
+    // Time complexity = O((n^2)logn)
+    nums.sort();
+    let mut count = 0;
+    for i in 0..nums.len() {
+        // Add further logic for triplet counting based on the requirement
+    }
+    count
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: insertion point for a sorted array, optimized time complexity
+
+[Instruction]
+Design a Rust function that takes a sorted array and a target value, and return a valid index where target can be inserted to maintain the array's sorted order. Optimize the function to run in logarithmic time complexity.
+
+For example, given `array = [1, 3, 5, 5, 6]` and `target = 5`, the function should return either 2 or 3 because 5 presents at both indices 2 and 3.
+
+[Response]
+To solve this problem efficiently and ensure logarithmic time complexity, we can use a binary search algorithm. Compared with a standard binary search that looks for an exact match, we can modify the algorithm such that when the target is not found, we return the `left` bound, which represents the index where the target can be inserted to maintain the array's sorted order. Since any valid index for insertion is acceptable, we can direclty return the index if there is an exact match.
+
+Here is a Rust function that implements this approach:
+
+```rust
+fn search_insert_position(nums: &[i32], target: i32) -> usize {
+    let mut left = 0;
+    let mut right = nums.len() as i32 - 1;
+
+    while left <= right {
+        let mid = (left + right) / 2;
+        if nums[mid as usize] == target {
+            return mid as usize;
+        } else if nums[mid as usize] < target {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    left as usize
+}
+```
+
+This implementation ensures that when `target` is not found, `left` represents the correct insertion index. This is because at the end of the loop, all elements to the left of `left` are smaller than `target`, all elements to the right of `left` are equal to or larger than `target`, and `left > right`. Therefore, `left` is the correct index for insertion to maintain the sorted order.
+
+[Tests]
+You can test the function with scenarios where the target is found at multiple indices and where the target is not present in the array:
+
+```rust
+assert!([2, 3].contains(&search_insert_position(&[1, 3, 5, 5, 6], 5)));
+assert_eq!(search_insert_position(&[1, 3, 5, 5, 6], 2), 1);
+assert_eq!(search_insert_position(&[1, 3, 5, 5, 6], 7), 5);
+assert_eq!(search_insert_position(&[1, 3, 5, 5, 6], 0), 0);
+```
+
+### Example 6
+[Code]
+fn decompress(&self) -> Vec<u8> {
+    let source = &self.compressed;
+    if source.is_empty() {
+        return vec![];
+    }
+
+    let mut pos = 0;
+    let mut node = &self.root;
+    let mut res = Vec::new();
+
+    while pos < source.len() {
+        let code = source[pos] as usize;
+        let child = &node.children[code];
+
+        if child.is_leaf {
+            res.push(child.value);
+            node = &self.root;
+        } else {
+            node = child;
+        }
+        pos += 1;
+    }
+
+    res
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: medium
+concepts: decoding compressed data, binary tree traversal, byte array processing
+
+[Instruction]
+Write a Rust function `huffman_decompress` that takes two arguments: `compressed_data`, a byte array of 0/1 sequence representing Huffman compressed data, and `huffman_tree`, a Huffman tree that stores the actual data (each leaf is associated with a character). The function should return the original uncompressed data as `bytes`. Define the `HuffmanNode` class yourself as a general tree structure with a `children` list.
+
+[Response]
+To accomplish the Huffman decompression, we first need to define the `HuffmanNode` class, which, as required, should be a general tree structure with a `children` list and an optional `value` attribute to store the character associated with a leaf node.
+
+Then, we'll implement the `huffman_decompress` function. This function will traverse the Huffman tree according to the bits in `compressed_data`. When it encounters a leaf node, the associated character will be appended to the result, and the traversal restarts from the root of the tree. This process continues until the entire `compressed_data` is processed.
+
+You said that `compressed_data` is a byte array of 0/1 sequence, so I assume that each byte, not each bit, represents a step in the Huffman tree. In practice, it is more efficient
+
+Here's how we can implement this:
+
+```rust
+struct HuffmanNode {
+    value: Option<u8>,
+    children: Vec<HuffmanNode>,
+}
+
+impl HuffmanNode {
+    fn new(value: Option<u8>) -> Self {
+        HuffmanNode {
+            value,
+            children: Vec::new(),
+        }
+    }
+}
+
+fn huffman_decompress(compressed_data: &[u8], huffman_tree: &HuffmanNode) -> Vec<u8> {
+    let mut result = Vec::new();
+    let mut node = huffman_tree;
+
+    for &bit in compressed_data {
+        if !node.children.is_empty() {
+            node = &node.children[bit as usize];
+        }
+        if node.children.is_empty() {
+            if let Some(value) = node.value {
+                result.push(value);
+            }
+            node = huffman_tree;
+        }
+    }
+
+    result
+}
+```
+
+In this implementation, each byte in `compressed_data` represents a bit, guiding the traversal of the Huffman tree. Characters are appended upon reaching leaf nodes and the result is then encoded to `bytes`.
+
+[Tests]
+You can test this function with a sample Huffman tree and compressed data to verify that the decompression works correctly:
+
+```rust
+let mut root = HuffmanNode::new(None);
+root.children = vec![
+    HuffmanNode {
+        value: Some(b'A'),
+        children: vec![
+            HuffmanNode::new(Some(b'C')),
+            HuffmanNode::new(Some(b'D'))
+        ],
+    },
+    HuffmanNode {
+        value: Some(b'B'),
+        children: vec![
+            HuffmanNode::new(Some(b'E')),
+            HuffmanNode::new(Some(b'F'))
+        ],
+    }
+];
+
+let compressed_data = vec![0, 1, 0, 0, 1, 1]; // 01 -> D, 00 -> C, 11 -> F
+
+assert_eq!(huffman_decompress(&compressed_data, &root), b"DCF");
+```
+
+### Example 7
+[Code]
+/// http://stackoverflow.com/a/1094933
+fn format_size(mut num: f64) -> String {
+    for unit in ["bytes", "KB", "MB", "GB"].iter() {
+        if num < 1024.0 && num > -1024.0 {
+            return format!("{:.1}{}", num, unit);
+        }
+        num /= 1024.0;
+    }
+    format!("{:.1}TB", num)
+}
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: arithmetic operations for size conversion, rounding numbers, dynamic unit selection, string interpolation
+
+[Instruction]
+Create a Rust function to format a file size in bytes into a human-readable string representation, using 'bytes', 'KB' (kilobytes), 'MB' (megabytes), 'GB' (gigabytes), or 'TB' (terabytes) units. The output should be rounded to one decimal place and follow the format: "{X.Y}{Unit}", where "Unit" is the appropriate size unit and "X.Y" is the rounded size. For example, `format_size(1024 * 512)` should return `'512.0KB'`, and `format_size(1024**2 - 1)` should return `'1024.0KB'`.
+
+[Response]
+To create such a function, we can use a loop to iterate through a predefined list of units (`['bytes', 'KB', 'MB', 'GB', 'TB']`) and check if the given number of bytes fits into the current unit by comparing it with 1024.0 and -1024.0 (for handling negative sizes). We'll keep dividing the number by 1024.0 until the correct unit is found where the number is less than 1024.0. Then, we'll format the result using the appropriate unit and the rounded size.
+
+```rust
+fn format_size(size_bytes: i64) -> String {
+    let units = ["bytes", "KB", "MB", "GB", "TB"];
+
+    // Directly return for 0 bytes to avoid division by zero in loop
+    if size_bytes == 0 {
+        return "0.0bytes".to_string();
+    }
+
+    let mut num = (size_bytes as f64).abs();
+    let mut unit = units[0];
+    for &u in units.iter().skip(1) {
+        if num < 1024.0 {
+            break;
+        }
+        num /= 1024.0;
+        unit = u;
+    }
+    
+    let formatted_size = format!("{:.1}{}", num, unit);
+    if size_bytes >= 0 {
+        formatted_size
+    } else {
+        format!("-{}", formatted_size)
+    }
+}
+```
+
+This implementation handles both positive and negative file sizes and returns the formatted size as a string, even though negative sizes are not common in real-world scenarios.
+
+[Tests]
+We can write tests that cover both positive and negative sizes across different units to validate the correctness of the `format_size` function:
+
+```rust
+let test_data = [
+    (1024_i64.pow(2), "1.0MB"),
+    (1024_i64.pow(2) - 1, "1024.0KB"),
+    (1024_i64.pow(3) * 512, "512.0GB"),
+    (1024_i64.pow(4) * 512, "512.0TB"),
+];
+
+for &(size, expected_output) in &test_data {
+    assert_eq!(format_size(size), expected_output);
+    assert_eq!(format_size(-size), format!("-{}", expected_output));
+}
+```
+
+### Example 8
+[Code]
+/// Adds asterisks to strings that appear multiple times, so the resulting
+/// list has only unique strings but still the same length, order, and meaning.
+/// For example:
+///     unify_stringlist(['a','a','b','a','c']) -> ['a','a*','b','a**','c']
+fn unify_stringlist(lst: Vec<&str>) -> Vec<String> {
+    assert!(lst.iter().all(|l| l.is_ascii()));
+
+    lst.iter()
+        .enumerate()
+        .map(|(i, &s)| format!("{}{}", s, "*".repeat(lst[..i].iter().filter(|&&x| x == s).count())))
+        .collect()
+}
+assert_eq!(unify_stringlist(vec!["a", "b", "c"]), vec!["a", "b", "c"]);
+assert_eq!(unify_stringlist(vec!["a", "a", "b", "a", "c"]), vec!["a", "a*", "b", "a**", "c"]);
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: list comprehension, unique string creation, precondition checking for type validation
+
+[Instruction]
+Design a Rust function to encode a list of strings into a unique list with the same length, order, and meaning. The new list is formed by appending asterisks (*) to duplicate strings. For instance, given ['a', 'a', 'b', 'a', 'c'], the function should return ['a', 'a*', 'b', 'a**', 'c'], while for ['a', 'b', 'c'] it should return ['a', 'b', 'c'] without any changes. Write assertions to ensure the input is a list of strings.
+
+Solve the problem in two lines of code, one for the precondition check and the other for the main logic.
+
+[Response]
+You can achieve this functionality by first ensuring the input meets your requirements using an `assert` statement with list comprehension. Then, use another list comprehension to iterate through the input list and append `'*'` to the strings. The number of `'*'` is the number of occurrences of the string before the current index.
+
+Here's how you can do it in two lines of Rust code:
+
+```rust
+fn encode_strings(input_list: Vec<&str>) -> Vec<String> {
+    assert!(input_list.iter().all(|item| item.is_ascii()), "Input must be a list of strings");
+    input_list.iter().enumerate().map(|(i, &s)| format!("{}{}", s, "*".repeat(input_list[..i].iter().filter(|&&x| x == s).count()))).collect()
+}
+```
+
+Note that although the function is concise, it is not the most efficient solution for large lists, as the `count` method has a time complexity of O(n) for each iteration.
+
+[Tests]
+You can test the function with the provided examples to ensure it correctly encodes the strings as expected:
+
+```rust
+assert_eq!(encode_strings(vec!["a", "a", "b", "a", "c"]), vec!["a", "a*", "b", "a**", "c"]);
+assert_eq!(encode_strings(vec!["a", "b", "c"]), vec!["a", "b", "c"]);
+```
+
+### Example 9
+[Code]
+/// Creates folds from the given data.
+///
+/// # Arguments
+/// * `data` - The data to fold
+/// * `count` - The number of folds to create
+///
+/// # Returns
+/// A vector of folds
+fn create_folds_list<T: Clone>(data: &[T], count: usize) -> Vec<Vec<T>> {
+    let fold_count = data.len() as f64 / count as f64;
+    let mut folds = Vec::new();
+
+    for fold_index in 0..count {
+        let low = (fold_index as f64 * fold_count).round() as usize;
+        let high = ((fold_index as f64 + 1.0) * fold_count).round() as usize;
+        let fold = data[low..high].to_vec();
+        folds.push(fold);
+    }
+
+    folds
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: medium
+concepts: data partitioning and slicing, learning from input-output examples
+
+[Instruction]
+Construct a Rust function `create_folds(data, count)` to create a list of folds from the given data, where each fold is a subsequence of the original data. The length of each fold should be approximately equal with at most a difference of 1. The function should satisfy the following assertions:
+
+```rust
+assert_eq!(
+        create_folds_list(&(0..12).collect::<Vec<_>>(), 2),
+        vec![(0..6).collect::<Vec<_>>(), (6..12).collect::<Vec<_>>()]
+    );
+    assert_eq!(
+        create_folds_list(&(0..8).collect::<Vec<_>>(), 2),
+        vec![(0..4).collect::<Vec<_>>(), (4..8).collect::<Vec<_>>()]
+    );
+    assert_eq!(create_folds_list(&(0..25).collect::<Vec<_>>(), -5), vec![]);
+    assert_eq!(
+        create_folds_list(&(0..6).collect::<Vec<_>>(), 2),
+        vec![(0..3).collect::<Vec<_>>(), (3..6).collect::<Vec<_>>()]
+    );
+```
+
+[Response]
+To create a Rust function that generates a list of folds from given data with each fold having approximately equal length (with at most a difference of 1 between any two folds), you can follow these steps:
+
+1. Return an empty list immediately if `count` is non-positive since it's not possible to create a valid number of folds.
+2. Divide the total length of the data by `count`, rounding down, to get the minimum number of items each fold should have.
+3. Calculate the remainder to see how many extra items need to be distributed among the folds. They are distributed one by one to the first `remainder` folds.
+4. Use a loop to create each fold, adjusting the starting and ending indices based on the calculations above to ensure each fold has the correct number of items.
+
+Here's how you can implement this:
+
+```rust
+fn create_folds(data_length: usize, count: isize) -> Vec<std::ops::Range<usize>> {
+    // Return an empty list if count is non-positive
+    if count <= 0 {
+        return vec![];
+    }
+
+    let fold_size = data_length / count as usize;
+    let remainder = data_length % count as usize;
+
+    let mut folds = Vec::new();
+    let mut start_index = 0;
+
+    for i in 0..count as usize {
+        // Add 1 element to each of the first `remainder` folds
+        let end_index = start_index + fold_size + if i < remainder { 1 } else { 0 };
+        folds.push(start_index..end_index);
+        start_index = end_index;
+    }
+
+    folds
+}
+```
+
+This implementation ensures that each fold has an equal length with at most a difference of 1 between any two folds. It handles edge cases, such as a non-positive `count`, by returning an empty list as specified.
+
+[Tests]
+You can test your code with the provided assertions to verify that the function works correctly:
+
+```rust
+assert_eq!(create_folds(0..12, 2), vec![0..6, 6..12]);
+assert_eq!(create_folds(0..8, 2), vec![0..4, 4..8]);
+assert_eq!(create_folds(0..25, -5), vec![]);
+assert_eq!(create_folds(0..6, 2), vec![0..3, 3..6]);
+```
+
+### Example 10
+[Code]
+fn duration(string: &str, pattern: &Regex, suffix_map: &HashMap<&str, i32>) -> Result<i32, String> {
+    let captures = pattern.captures(string).ok_or_else(|| format!("Invalid duration: {}", string))?;
+
+    let suffix = captures.get(2).map(|m| m.as_str()).ok_or_else(|| format!("Invalid duration suffix: {}", string))?;
+    
+    let multiplier = suffix_map.get(suffix).ok_or_else(|| format!("Invalid duration suffix: {}", string))?;
+    
+    let value: i32 = captures.get(1).unwrap().as_str().parse().map_err(|_| format!("Invalid duration: {}", string))?;
+    
+    Ok(value * multiplier)
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: medium
+concepts: regular expression for pattern matching, dictionary lookup for suffix mapping, error handling with exceptions
+
+[Instruction]
+Create a Rust function that converts a string representation of a time duration into its total number of seconds.
+The input string should follow a format that includes a numeric part followed by a time unit suffix without any spaces between.
+The time unit can be seconds in the form of 's' or 'sec', minutes in the form of 'm' or 'min', hours in the form of 'h' or 'hour', and days in the form of 'd' or 'day' (units are in small case).
+If the input format is invalid, the function should raise a ValueError.
+
+For example, the function should pass the following assertions:
+
+```rust
+assert_eq!(parse_duration("15s").unwrap(), 15);
+assert_eq!(parse_duration("2min").unwrap(), 120);
+assert_eq!(parse_duration("1h").unwrap(), 3600);
+assert_eq!(parse_duration("1d").unwrap(), 86400);
+assert!(parse_duration("30").is_err());
+```
+
+[Response]
+The desired function aims to transform a string representation into its total number of seconds. The implementation can be split into two parts:
+
+Input validation:
+
+1. The input string includes two parts: a number as the prefix and the unit as the suffix.
+2. We can use regular expression to assert the prefix must be a number (d+) and suffix must be one of s/sec/m/min/h/hour/d/day.
+3. If the input string cannot the regular expression, we raise a ValueError.
+
+Result computation:
+
+1. Based on the matches of regular expression, we capture the number and unit part.
+2. We convert the unit to seconds: 's'/'sec' -> 1 second, 'm'/'min' -> 60 seconds, 'h'/'hour' -> 3600 seconds, 'd'/'day' -> 86400 seconds.
+3. We multiply the seconds of the unit and the prefix number and return it as an integer.
+
+Here's how you can implement this:
+
+```rust
+use regex::Regex;
+use std::collections::HashMap;
+
+fn parse_duration(duration_str: &str) -> Result<i32, String> {
+    let pattern = Regex::new(r"(\d+)(s|sec|m|min|h|hour|d|day)$").unwrap();
+    let suffix_map: HashMap<&str, i32> = [
+        ("s", 1), ("sec", 1),
+        ("m", 60), ("min", 60),
+        ("h", 3600), ("hour", 3600),
+        ("d", 86400), ("day", 86400),
+    ].iter().cloned().collect();
+
+    let captures = pattern
+        .captures(duration_str)
+        .ok_or_else(|| format!("Invalid duration: {}", duration_str))?;
+
+    let value: i32 = captures.get(1).unwrap().as_str().parse()
+        .map_err(|_| format!("Invalid duration value: {}", duration_str))?;
+    let suffix = captures.get(2).unwrap().as_str();
+
+    let multiplier = suffix_map.get(suffix)
+        .ok_or_else(|| format!("Invalid duration suffix: {}", duration_str))?;
+
+    Ok(value * multiplier)
+}
+```
+
+[Tests]
+You can test your code on various valid and invalid inputs to ensure that the function behaves as expected:
+
+```rust
+# Test additional valid inputs with different suffix representations
+assert_eq!(parse_duration("10sec").unwrap(), 10, "Check for 'sec' suffix");
+assert_eq!(parse_duration("3min").unwrap(), 180, "Check for 'min' suffix");
+assert_eq!(parse_duration("5h").unwrap(), 18000, "Check for 'h' suffix");
+assert_eq!(parse_duration("2hour").unwrap(), 7200, "Check for 'hour' suffix");
+assert_eq!(parse_duration("1day").unwrap(), 86400, "Check for 'day' suffix");
+
+# Test edge cases
+assert_eq!(parse_duration("0s").unwrap(), 0, "Zero duration");
+assert_eq!(parse_duration("0min").unwrap(), 0, "Zero minutes");
+
+# Test inputs with leading zeros
+assert_eq!(parse_duration("001s").unwrap(), 1, "Leading zeros");
+assert_eq!(parse_duration("010min").unwrap(), 600, "Leading zeros with minutes");
+
+# Test case sensitivity and invalid suffix handling
+fn assert_value_error(duration_str: &str) {
+    if parse_duration(duration_str).is_ok() {
+        panic!("Expected ValueError for duration: {}", duration_str);
+    }
+}
+
+assert_value_error("10S");
+assert_value_error("2hours");
+assert_value_error("5 mins");
+assert_value_error("h1");
+assert_value_error("100");
+
+# Test extremely large numbers
+assert_eq!(parse_duration("1000000s").unwrap(), 1000000, "Very large number of seconds");
+```
+
+### Example 11
+[Code]
+struct Restaurant {
+    name: String,
+    cuisine_type: String,
+    number_served: u32,
+}
+
+impl Restaurant {
+    fn new(name: &str, cuisine_type: &str) -> Self {
+        Restaurant {
+            name: name.to_string(),
+            cuisine_type: cuisine_type.to_string(),
+            number_served: 0,
+        }
+    }
+
+    fn describe_restaurant(&self) {
+        let msg = format!("{} tiene los mejores {}.", self.name, self.cuisine_type);
+        println!("\n{}", msg);
+    }
+
+    fn open_restaurant(&self) {
+        let msg = format!("{} Está Abierta. ¡Adelante! \n", self.name);
+        println!("\n{}", msg);
+    }
+
+    fn set_number_served(&mut self, number_served: u32) {
+        self.number_served = number_served; // Aquí establecemos la cantidad de clientes atendidos
+    }
+
+    fn increment_number_served(&mut self, additional_served: u32) {
+        self.number_served += additional_served; // Aquí incrementamos la cantidad de clientes atendidos
+    }
+}
+
+
+[Property]
+category: class implementation
+language: Rust
+difficulty: hard
+concepts: object-oriented programming, string formatting and manipulation, encapsulation, input validation
+
+[Instruction]
+Develop a Rust class `StringEnhancer` that offers advanced tools for managing a string. The class should maintain an internal state that is initially an empty string. The class should support extending the string with additional prefix or suffix, converting the entire string to lowercase or uppercase, and altering specific characters within the string. All the operations are communicated through a central method: `apply_operation(self, operation: str)`.
+
+The method `apply_operation` interprets the operations specified in the form of `"[opname]:[arg]"`. Here are the detailed formats for each operation, explained through examples:
+- Prefix addition: `apply_operation("prefix:Hello, ")`
+- Suffix addition: `apply_operation("suffix: World!")`
+- Lowercase conversion: `apply_operation("lower:")`
+- Uppercase conversion: `apply_operation("upper:")`
+- Character replacement: `apply_operation("replace:a->e")`
+
+The class should handle erroneous inputs gracefully, such as incorrect operation formats or arguments. Additionally, implement the `__str__` method to return a formatted string showing the current value of the string and a list of operations that have been applied to it.
+
+[Response]
+The goal is to create a Rust class `StringEnhancer` capable of managing a string through various operations, using a central method `apply_operation`. The class also needs to handle errors gracefully and record the operation history. Here are the key steps to implement this class:
+
+- Initialize the class with an empty string and an empty list to store the operations.
+- Inside the `apply_operation` method:
+    - Parse the operation string to determine the operation type and argument (if any).
+    - Gracefully handle any errors in the input format by printing an error message without actually raising an exception.
+    - Execute the correct string manipulation based on the operation.
+    - Append the operation to the records list.
+- Implement the `__str__` method by concatenating the current string value and the recorded operations.
+
+Here's how you can implement the `StringEnhancer` class:
+
+```rust
+struct StringEnhancer {
+    string: String,
+    operations: Vec<String>,
+}
+
+impl StringEnhancer {
+    fn new() -> Self {
+        StringEnhancer {
+            string: String::new(),
+            operations: Vec::new(),
+        }
+    }
+
+    fn apply_operation(&mut self, operation: &str) {
+        let parts: Vec<&str> = operation.split(':').collect();
+        if parts.len() != 2 {
+            println!("Invalid operation format. Expected '[opname]:[arg]'");
+            return;
+        }
+
+        let opname = parts[0];
+        let arg = parts[1];
+
+        match opname {
+            "prefix" => self.string = format!("{}{}", arg, self.string),
+            "suffix" => self.string.push_str(arg),
+            "lower" => self.string = self.string.to_lowercase(),
+            "upper" => self.string = self.string.to_uppercase(),
+            "replace" => {
+                if !arg.contains("->") {
+                    println!("Invalid replace operation format. Expected 'replace:a->b'");
+                    return;
+                }
+                let replace_parts: Vec<&str> = arg.split("->").collect();
+                if replace_parts.len() == 2 {
+                    self.string = self.string.replace(replace_parts[0], replace_parts[1]);
+                }
+            }
+            _ => println!("Unknown operation: {}", opname),
+        }
+
+        self.operations.push(operation.to_string());
+    }
+}
+
+impl std::fmt::Display for StringEnhancer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let operation_history = self.operations.join(", ");
+        write!(f, "Current String: {}\nOperations: {}", self.string, operation_history)
+    }
+}
+```
+
+[Tests]
+To test the class, you should apply different operations and check if the string and operation history are updated correctly:
+
+```rust
+let mut enhancer = StringEnhancer::new();
+enhancer.apply_operation("prefix:Hello");
+enhancer.apply_operation("suffix:, World!");
+enhancer.apply_operation("lower:");
+enhancer.apply_operation("replace:o->a");
+
+let expected_operation_history = vec![
+    "prefix:Hello".to_string(),
+    "suffix:, World!".to_string(),
+    "lower:".to_string(),
+    "replace:o->a".to_string(),
+];
+let expected_operation_history_str = expected_operation_history.join(", ");
+let expected_str_value = "hella, warld!";
+
+assert_eq!(enhancer.operations, expected_operation_history);
+assert_eq!(
+    enhancer.to_string(),
+    format!(
+        "Current String: {}\nOperations: {}",
+        expected_str_value, expected_operation_history_str
+    )
+);
+```
+
+### Example 12
+[Code]
+while cur_num < sorted_importances.len() {
+    let cluster_idx = sorted_importances[cur_num][1] as usize;
+    let filter_idx = sorted_importances[cur_num][2] as usize;
+
+    if tmp_pruning_quotas[cluster_idx] > 0 {
+        tmp_pruning_quotas[cluster_idx] -= 1;
+    } else {
+        cur_num += 1;
+        continue;
+    }
+
+    let cluster = self.pruned_module_groups_info.get_cluster_by_id(cluster_idx);
+    for node in &cluster.elements {
+        // Additional operations on `node` as needed
+    }
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: iteration with a while loop, index-based data access, conditional branching, nested loops
+
+[Instruction]
+Create a Rust function that identifies all pairs of elements within a list of integers where the second element of the pair is at least greater than the first by `growth_ratio` and the indices of the elements are within a specified `maximum_distance` from each other.
+
+[Response]
+You can write a Rust function `find_pairs` that takes three parameters:
+
+- `numbers`: The list of integers.
+- `growth_ratio`: A non-negative `float` that specifies the ratio by which the second element should be greater than the first.
+- `maximum_distance`: A non-negative integer that indicates the maximum index distance allowed between the two elements in the pair.
+
+The function will return a list of tuples where each tuple contains the indices of the pair of elements that satisfy the conditions.
+
+Here is how you can implement this function:
+
+```rust
+fn find_pairs(numbers: &[i32], growth_ratio: f32, maximum_distance: usize) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
+    for i in 0..numbers.len() {
+        // For each number, look ahead up to `maximum_distance` elements
+        for j in i + 1..usize::min(i + 1 + maximum_distance, numbers.len()) {
+            if (numbers[j] - numbers[i]) as f32 >= growth_ratio {
+                pairs.push((i, j));
+            }
+        }
+    }
+    pairs
+}
+```
+
+This function iterates over the pairs of elements in the list whose indices satisfy the distance constraint and stores the valid pairs that meet the growth ratio condition.
+
+[Tests]
+To ensure the function's correct behavior, you can compare your implementation against a brute-force approach that leverages list comprehension to first generate all possible pairs and then filter them based on the conditions. The tests should cover both the basic functionality where pairs are found, and edge cases where no pairs are found, while also altering the `growth_ratio` and `maximum_distance` parameters to cover more cases:
+
+```rust
+fn brute_force_pairs(numbers: &[i32], growth_ratio: f32, maximum_distance: usize) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
+    for i in 0..numbers.len() {
+        for j in i + 1..usize::min(i + 1 + maximum_distance, numbers.len()) {
+            if (numbers[j] - numbers[i]) as f32 >= growth_ratio {
+                pairs.push((i, j));
+            }
+        }
+    }
+    pairs
+}
+
+let test_cases = vec![
+    (vec![30, 15, 60, 7, 77, 13, 10], 8.0, 3),
+    (vec![30, 15, 60, 7, 77, 13, 10], 0.2, 3),
+    (vec![30, 15, 60, 7, 77, 13, 10], 30.0, 0),
+    (vec![30, 15, 60, 7, 77, 13, 10], 0.0, 2),
+    (vec![], 1.0, 3),
+    (vec![8, 8, 8, 8], 1.0, 0),
+];
+
+for (numbers, growth_ratio, maximum_distance) in test_cases {
+    let expected_pairs = brute_force_pairs(&numbers, growth_ratio, maximum_distance);
+    assert_eq!(find_pairs(&numbers, growth_ratio, maximum_distance), expected_pairs);
+}
+```
+
+### Example 13
+[Code]
+fn accuracy(output: &Tensor, target: &Tensor, topk: &[i64]) -> Vec<Tensor> {
+    let maxk = *topk.iter().max().unwrap();
+    let batch_size = target.size()[0];
+
+    let (_, pred) = output.topk(maxk, 1, true, true);
+    let pred = pred.transpose(0, 1);
+    let correct = pred.eq(&target.view([1, -1]).expand_as(&pred));
+
+    topk.iter().map(|&k| {
+        let correct_k = correct.slice(0, 0, k, 1).view(-1).to_kind(Kind::Float).sum(Kind::Float);
+        correct_k * (100.0 / batch_size as f64)
+    }).collect()
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: medium
+concepts: top-k accuracy computation, tensor operations in PyTorch, batch processing, default arguments
+
+[Instruction]
+Create a Rust function `calculate_top_k_accuracy` using PyTorch that calculates the top-k accuracy from a batch of predictions and actual labels. It should accept two tensors, `predictions` and `targets`, and an integer `k` (default 3). The function should return the average top-k accuracy as a float, determining if the true label is within the top `k` predictions for each input.
+
+[Response]
+The function will take the following parameters as input:
+
+- `predictions`: a tensor of shape `(batch_size, num_classes)` that contains the predicted scores for each class.
+- `targets`: a tensor of shape `(batch_size,)` that contains the true class labels for each input.
+- `k`: an integer representing the number of top predictions to consider for computing the accuracy. The default value should be 3.
+
+Here is how you can write this function using PyTorch:
+
+```rust
+use tch::{Tensor, Kind};
+
+fn calculate_top_k_accuracy(predictions: &Tensor, targets: &Tensor, k: i64) -> f64 {
+    let k = k.min(predictions.size()[1]); // Ensure k doesn't exceed the number of classes
+    let (_, top_k_indices) = predictions.topk(k, 1, true, true);
+    let target_expanded = targets.view([-1, 1]).expand_as(&top_k_indices);
+    let correct_predictions = top_k_indices.eq_tensor(&target_expanded);
+    let correct = correct_predictions.any_dim(1, false);
+    let accuracy = correct.to_kind(Kind::Float).mean(Kind::Float);
+    accuracy.double_value(&[])
+}
+```
+
+The function retrieves the top k predictions' indices, aligns shapes for comparison with true labels, computes accuracy by checking matches, and returns the average accuracy as a float.
+
+[Tests]
+```rust
+// Test 1: Basic functionality test
+let k = 1;
+let labels = Tensor::of_slice(&[2, 0, 1, 1]);
+let preds = Tensor::of_slice(&[
+    [0.1, 0.2, 0.9],  // yes
+    [1.0, 0.2, 0.3],  // yes
+    [0.3, 1.1, 0.2],  // yes
+    [0.6, 0.1, 0.3],  // no
+])
+.view([4, 3]);
+let accuracy = calculate_top_k_accuracy(&preds, &labels, k);
+assert_eq!(accuracy, 0.75);
+
+// Test 2: Edge case with k = number of classes
+let k = 3;
+let preds = Tensor::of_slice(&[
+    [0.5, -1.2, 0.3], // yes
+    [-1.0, 0.1, 1.2], // yes
+])
+.view([2, 3]);
+let labels = Tensor::of_slice(&[0, 2]);
+let accuracy = calculate_top_k_accuracy(&preds, &labels, k);
+assert_eq!(accuracy, 1.0);
+
+// Test 3: k greater than the number of classes should still work
+let preds = Tensor::of_slice(&[
+    [0.1, -0.2], // yes
+    [-0.3, 0.4], // yes
+])
+.view([2, 2]);
+let labels = Tensor::of_slice(&[1, 0]);
+let accuracy = calculate_top_k_accuracy(&preds, &labels, 5);
+assert_eq!(accuracy, 1.0);
+```
+
+### Example 14
+[Code]
+fn alternating_characters(s: &str) -> usize {
+    let mut i = 0;
+    let mut j = 1;
+    let mut count = 0;
+    let chars: Vec<char> = s.chars().collect();
+
+    while j < chars.len() {
+        if chars[j] == chars[i] {
+            while j < chars.len() && chars[j] == chars[i] {
+                j += 1;
+            }
+            count += j - i - 1;
+        }
+        i = j;
+        j += 1;
+    }
+
+    count
+}
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: 2-pointer technique, conditional loop, string traversal and character comparison, count accumulation
+
+[Instruction]
+Write a Rust function called `count_conditional_matches` that takes two strings, `str1` and `str2`, as well as a boolean flag `strict` as arguments. The function should count how many times characters from the end of `str1` match with characters from the beginning of `str2` when both strings are traversed simultaneously. The traversal should continue until a pair of characters do not match or until a specific condition influenced by the `strict` flag is met:
+
+- If `strict` is `True`, stop counting as soon as a non-matching pair is found.
+- If `strict` is `False`, skip the non-matching character in `str1` and continue matching with the next character.
+
+The function should return the total count of matching characters. This implementation requires managing two pointers for the characters in `str1` and `str2`, respectively, and using a conditional loop to handle different stopping criteria based on the `strict` parameter.
+
+[Response]
+We can use two pointers, one for each string, to iterate over the characters from the end of str1 and the beginning of str2. The loop continues either until the characters do not match (for both strict and non-strict cases) or until it exhausts one of the strings. The `strict` flag controls the behavior when a mismatch is encountered.
+
+```rust
+fn count_conditional_matches(str1: &str, str2: &str, strict: bool) -> usize {
+    // Initialize pointers for the end of str1 and the start of str2
+    let mut i = str1.len() as isize - 1;
+    let mut j = 0;
+    let mut count = 0;
+    let chars1: Vec<char> = str1.chars().collect();
+    let chars2: Vec<char> = str2.chars().collect();
+
+    // Loop as long as i is non-negative and j is less than the length of str2
+    while i >= 0 && j < chars2.len() {
+        if chars1[i as usize] == chars2[j] {
+            count += 1;
+            i -= 1;
+            j += 1;
+        } else if strict {
+            break;
+        } else {
+            i -= 1;
+        }
+    }
+
+    count
+}
+```
+
+[Tests]
+The function can be tested with various inputs to ensure it handles both strict and non-strict cases correctly:
+
+```rust
+// Test function with matching characters
+assert_eq!(count_conditional_matches("hello", "o", true), 1);
+assert_eq!(count_conditional_matches("fancy", "nancy", false), 2);
+assert_eq!(count_conditional_matches("abcde", "e", false), 1);
+assert_eq!(count_conditional_matches("helicopter", "ranges", true), 1);
+
+// Test function with no matches
+assert_eq!(count_conditional_matches("apple", "banana", true), 0);
+assert_eq!(count_conditional_matches("abcdef", "xyzab", false), 0);
+
+// Test when both strings are empty
+assert_eq!(count_conditional_matches("", "", true), 0);
+assert_eq!(count_conditional_matches("", "", false), 0);
+
+// Test when one string is empty
+assert_eq!(count_conditional_matches("nonempty", "", true), 0);
+assert_eq!(count_conditional_matches("", "nonempty", false), 0);
+```
+
+### Example 15
+[Code]
+/// Converts a phrase with an Oxford comma structure to a list of items.
+/// Examples:
+/// - "Eeeny, Meeny, Miney, and Moe" --> ["Eeeny", "Meeny", "Miney", "Moe"]
+/// - "Black and White" --> ["Black", "White"]
+/// - "San Francisco and Saint Francis" --> ["San Francisco", "Saint Francis"]
+fn oxford_comma_text_to_list(phrase: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    for subphrase in phrase.split(", ") {
+        items.extend(
+            subphrase.split(" and ").map(|item| item.trim().to_string())
+        );
+    }
+    items
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: string manipulation and parsing, list comprehension, iterative list extension, handling text connectors
+
+[Instruction]
+Create a concise Rust function that transforms a string into a list of individual items. The input string contains a list of items separated by commas and the last item preceded by an optional "and". For example:
+- Input: "Eeeny, Meeny, Miney, Moe" --> Output: ['Eeeny', 'Meeny', 'Miney', 'Moe']
+- Input: "Eeeny, Meeny, Miney, and Moe" --> Output: ['Eeeny', 'Meeny', 'Miney', 'Moe']
+- Input: "San Francisco and San Mateo" --> Output: ['San Francisco', 'San Mateo']
+Remove any leading or trailing whitespace.
+
+[Response]
+Here's a concise function `string_to_list` to transform a comma-separated string into a list, replacing " and " with a comma, splitting the result, and stripping whitespace:
+
+```rust
+fn string_to_list(s: &str) -> Vec<String> {
+    s.replace(" and ", ",").split(',').filter_map(|item| Some(item.trim().to_string()).filter(|t| !t.is_empty())).collect()
+}
+```
+
+This approach ensures no empty strings are included if there are excess commas or spaces.
+
+[Tests]
+We can test this function on different input strings (e.g., with and without the "and" connector, different numbers of items):
+
+```rust
+assert_eq!(
+    string_to_list("Eeeny, Meeny, Miney, Moe"),
+    vec!["Eeeny", "Meeny", "Miney", "Moe"]
+);
+assert_eq!(
+    string_to_list("Eeeny, Meeny, Miney, and Moe"),
+    vec!["Eeeny", "Meeny", "Miney", "Moe"]
+);
+assert_eq!(
+    string_to_list("San Francisco and San Mateo"),
+    vec!["San Francisco", "San Mateo"]
+);
+assert_eq!(
+    string_to_list("Single Item"),
+    vec!["Single Item"]
+);
+```
+
+### Example 16
+[Code]
+fn get_hashes<P: AsRef<Path>>(path_or_buffer: P) -> Result<Digests, Box<dyn std::error::Error>> {
+    let mut buf = Vec::new();
+    
+    // Check if input is a file path or buffer content
+    if path_or_buffer.as_ref().is_file() {
+        let mut file = File::open(path_or_buffer)?;
+        file.read_to_end(&mut buf)?;
+    } else {
+        buf = path_or_buffer.as_ref().to_vec();
+    }
+
+    // Compute the various hashes
+    let md5 = hex_digest(MD5, &buf);
+    let sha1 = hex_digest(SHA1_FOR_LEGACY_USE_ONLY, &buf);
+    let sha256 = hex_digest(SHA256, &buf);
+    let sha512 = hex_digest(SHA512, &buf);
+    let ctph = ssdeep::hash(&buf).unwrap_or_default();
+
+    Ok(Digests {
+        md5,
+        sha1,
+        sha256,
+        sha512,
+        ctph,
+    })
+}
+
+fn hex_digest(algorithm: ring::digest::Algorithm, data: &[u8]) -> String {
+    let mut context = Context::new(&algorithm);
+    context.update(data);
+    hex::encode(context.finish().as_ref())
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: binary string hash computation, file content reading, string hashing, named tuples, conditional file content reading
+
+[Instruction]
+Implement a Rust function that computes different types of hash values for the binary content of a file whose path is defined by an input string. You should calculate 'md5', 'sha1', 'sha256', and 'sha512' and return a `namedtuple` of these fields. When the input string does not correspond to a file, the function should directly compute the hash values of path itself.
+
+[Response]
+To compute the hashes of a file or a string, we'll follow these steps:
+
+1. If the input is a valid file path, read the binary content of the file.
+2. Otherwise, convert the input string to a binary string.
+3. Compute hash values of all types using the `hashlib` module.
+4. Return the hash values as a `namedtuple` for easy access.
+
+Here's how you can implement this function:
+
+```rust
+use std::fs;
+use std::io::Read;
+use std::path::Path;
+use ring::digest::{Context, Digest, SHA1_FOR_LEGACY_USE_ONLY, SHA256, SHA512, MD5};
+use hex;
+
+struct HashValues {
+    md5: String,
+    sha1: String,
+    sha256: String,
+    sha512: String,
+}
+
+fn compute_hashes(file_path: &str) -> HashValues {
+    let content = match fs::read(file_path) {
+        Ok(data) => data,
+        Err(_) => file_path.as_bytes().to_vec(), // Handle missing file or directory error
+    };
+
+    let md5_hash = hex_digest(MD5, &content);
+    let sha1_hash = hex_digest(SHA1_FOR_LEGACY_USE_ONLY, &content);
+    let sha256_hash = hex_digest(SHA256, &content);
+    let sha512_hash = hex_digest(SHA512, &content);
+
+    HashValues {
+        md5: md5_hash,
+        sha1: sha1_hash,
+        sha256: sha256_hash,
+        sha512: sha512_hash,
+    }
+}
+
+fn hex_digest(algorithm: ring::digest::Algorithm, data: &[u8]) -> String {
+    let mut context = Context::new(&algorithm);
+    context.update(data);
+    hex::encode(context.finish().as_ref())
+}
+
+fn main() {
+    let file_path = "example.txt";
+    let hashes = compute_hashes(file_path);
+    println!("MD5: {}", hashes.md5);
+    println!("SHA1: {}", hashes.sha1);
+    println!("SHA256: {}", hashes.sha256);
+    println!("SHA512: {}", hashes.sha512);
+}
+```
+
+[Tests]
+To test the function, you can provide string inputs to avoid file I/O operations and verify that the hash values are correctly computed:
+
+```rust
+let string = "random string";
+let binary = string.as_bytes();
+let computed_hashes = compute_hashes(string);
+// Manually calculate the expected hashes to compare with `compute_hashes`
+let expected_md5 = hex_digest(MD5, binary);
+let expected_sha1 = hex_digest(SHA1_FOR_LEGACY_USE_ONLY, binary);
+let expected_sha256 = hex_digest(SHA256, binary);
+let expected_sha512 = hex_digest(SHA512, binary);
+
+// Assertions
+assert_eq!(computed_hashes.md5, expected_md5);
+assert_eq!(computed_hashes.sha1, expected_sha1);
+assert_eq!(computed_hashes.sha256, expected_sha256);
+assert_eq!(computed_hashes.sha512, expected_sha512);
+```
+
+### Example 17
+[Code]
+use std::collections::HashMap;
+
+struct Solution;
+
+impl Solution {
+    fn sum_of_unique(nums: Vec<i32>) -> i32 {
+        let mut counts = HashMap::new();
+        for &num in &nums {
+            *counts.entry(num).or_insert(0) += 1;
+        }
+        counts.iter().filter(|&(_, &v)| v == 1).map(|(&k, _)| k).sum()
+    }
+}
+
+[Property]
+category: function implementation
+language: Rust
+difficulty: easy
+concepts: dictionary-based counting, filtering unique elements with list comprehension, summation of elements based on condition
+
+[Instruction]
+Write a Rust function that takes a list from user input and prints the sum of counts for elements that occur more than once. Use a dictionary to count frequencies efficiently. Utilize a list comprehension to extract repeated elements based on the frequency counts, and sum their corresponding counts from the dictionary.
+
+[Response]
+To implement this function, we first need to parse the user input as a list of integers and then count the frequency of each element using a dictionary. We can then calculate the sum of the counts for elements that occur more than once.
+
+Here's a Rust function that accomplishes this:
+
+```rust
+use std::collections::HashMap;
+use std::io::{self, Write};
+
+fn sum_repeated_counts() {
+    let mut input = String::new();
+    print!("Enter numbers: ");
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut input).expect("Failed to read input");
+
+    let nums: Vec<i32> = input
+        .trim()
+        .split_whitespace()
+        .filter_map(|s| s.parse().ok())
+        .collect();
+
+    let mut freq_dict = HashMap::new();
+    for &num in &nums {
+        *freq_dict.entry(num).or_insert(0) += 1;
+    }
+
+    let sum_of_repeats: i32 = freq_dict.values().filter(|&&v| v > 1).sum();
+    println!("{}", sum_of_repeats);
+}
+```
+
+[Tests]
+We can test this program with I/O redirection to simulate user input and output. Here is an example:
+
+```rust
+fn run_test(input_data: &str, expected_output: &str) {
+    use std::io::{self, BufRead};
+
+    // Set up simulated input and output
+    let mut input = input_data.as_bytes();
+    let mut output = Vec::new();
+
+    // Redirect standard input and output
+    io::stdin().lock().read_to_end(&mut input).unwrap();
+    let mut stdout = io::stdout();
+    writeln!(stdout, "{}", sum_repeated_counts()).unwrap();
+
+    // Verify the output
+    assert_eq!(String::from_utf8(output).unwrap(), expected_output);
+}
+
+let test_cases = vec![
+    ("1 2 2 3 3 3\n", "5\n"),
+    ("1 1 1 1 1\n", "5\n"),
+    ("1 2 3 4 5\n", "0\n"),
+    ("\n", "0\n"),
+];
+
+for (input_data, expected_output) in test_cases {
+    run_test(input_data, expected_output);
+}
+```
+
+### Example 18
+
+[Code]
+let file = File::open("cmd.sh")?;
+let reader = io::BufReader::new(file);
+
+for (i, line) in reader.lines().enumerate() {
+    let cmd = line?.trim().to_string();
+    println!("{} {}", i, cmd);
+
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(&cmd)
+        .output()
+        .expect("Failed to execute command");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    println!("{}", stdout);
+}
+
+Ok(())
+
+[Property]
+category: program implementation
+language: Rust
+difficulty: medium
+concepts: iterating over file lines, command execution from file input, new line character removal
+
+[Instruction]
+Develop a Rust program that reads a text file containing one shell command per line and executes these commands sequentially. Each command should be sanitized by removing unnecessary newline characters before execution. Provide clear error handling and logging to manage exceptions that might occur during the execution of the commands.
+
+[Response]
+To create a Rust program that reads and executes shell commands from a text file, we can use Rust’s built-in module `subprocess` for running the commands and `logging` for handling logs and errors. The program will involve reading and sanitizing the commands from a file, executing them sequentially, and logging the results or errors.
+
+Below is the Rust script that demonstrates this:
+
+```rust
+use std::fs::File;
+use std::io::{self, BufRead};
+use std::process::Command;
+use log::{info, error};
+use env_logger::Builder;
+use std::path::Path;
+
+fn read_commands(file_path: &str) -> Result<Vec<String>, io::Error> {
+    /// Reads a text file and returns a list of commands.
+    let file = File::open(file_path)?;
+    let reader = io::BufReader::new(file);
+
+    // Remove newline characters and spaces
+    let commands: Vec<String> = reader
+        .lines()
+        .filter_map(|line| line.ok())
+        .map(|cmd| cmd.trim().to_string())
+        .collect();
+
+    if commands.is_empty() {
+        error!("The file {} is empty.", file_path);
+    }
+    Ok(commands)
+}
+
+fn execute_command(command: &str) {
+    /// Executes a single shell command.
+    info!("Executing command: {}", command);
+    match Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            info!("Command output: {}", stdout.trim());
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            error!("Error executing command '{}': {}", command, stderr.trim());
+        }
+        Err(e) => error!("An unexpected error occurred: {}", e),
+    }
+}
+
+fn main() {
+    /// Main function to read commands from a file and execute them.
+    Builder::new().format_timestamp(None).init();
+
+    let file_path = "cmd.sh"; // Example file path
+    match read_commands(file_path) {
+        Ok(commands) => {
+            for command in commands {
+                execute_command(&command);
+            }
+        }
+        Err(e) => error!("The file {} could not be read: {}", file_path, e),
+    }
+}
+```
+
+[Tests]
+To test this program, we can use Rust's `unittest` framework along with `mock_open` to simulate file operations, `patch` to mock `subprocess.run` for testing command execution, and `assertLogs` to verify the logging output. Here's an example of how you can write tests for this program:
+
+```rust
+use std::fs;
+use std::io::{self, Write};
+use std::process::Command;
+use log::{error};
+use assert_cmd::prelude::*;
+use mockall::{automock, predicate::*};
+use std::path::Path;
+
+#[automock]
+fn read_commands(file_path: &str) -> Result<Vec<String>, io::Error> {
+    let file = fs::File::open(file_path)?;
+    let reader = io::BufReader::new(file);
+
+    let commands: Vec<String> = reader
+        .lines()
+        .filter_map(|line| line.ok())
+        .map(|cmd| cmd.trim().to_string())
+        .collect();
+
+    Ok(commands)
+}
+
+#[automock]
+fn execute_command(command: &str) -> Result<String, io::Error> {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output()?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
+        error!("Error executing command '{}': {}", command, error_msg);
+        Err(io::Error::new(io::ErrorKind::Other, error_msg))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockall::predicate::*;
+    use std::fs::File;
+    use std::io::{self, Write};
+
+    #[test]
+    fn test_read_commands_success() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        writeln!(file, "ls\npwd").unwrap();
+
+        let commands = read_commands(file.path().to_str().unwrap()).unwrap();
+        assert_eq!(commands, vec!["ls", "pwd"]);
+    }
+
+    #[test]
+    fn test_read_commands_file_not_found() {
+        let result = read_commands("nonexistent_path");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_execute_command_success() {
+        let mut cmd = Command::cargo_bin("sh").unwrap();
+        cmd.arg("-c").arg("echo 'Execution successful'");
+        cmd.assert()
+            .success()
+            .stdout(predicates::str::contains("Execution successful"));
+    }
+
+    #[test]
+    fn test_execute_command_failure() {
+        let mut cmd = Command::cargo_bin("sh").unwrap();
+        cmd.arg("-c").arg("nonexistent_command");
+        let result = cmd.assert().failure();
+        assert!(result.is_err());
+    }
+}
+```
+
+### Example 19
+[Code]
+fn busca_linear_recursiva(array: &[i32], elemento: i32) -> isize {
+    busca_recursiva(array, elemento, -1)
+}
+
+fn busca_recursiva(array: &[i32], elemento: i32, mut i: isize) -> isize {
+    i += 1;
+    if i as usize == array.len() {
+        return -1;
+    }
+    if array[i as usize] == elemento {
+        return i;
+    }
+    busca_recursiva(array, elemento, i)
+}
+
+[Property]
+category: program implementation
+language: Rust
+difficulty: medium
+concepts: linear search with recursion, default parameter initialization, multiple base cases in recursion
+
+[Instruction]
+Design a Rust program that not only searches for a target value in a list using recursion but also constructs a trace of the indices it checks. This program should return both the index of the target, if found, or `-1` if not, alongside a list of the indices it examined during the search. The function should handle cases where the target is not present in the list.
+
+[Response]
+We can implement a recursive linear search function that returns the index of the target element if found or `-1` if not. To keep track of the indices examined during the search, we can pass a list as an additional parameter to store these indices.
+
+Here is the Rust program that implements this functionality:
+
+```rust
+fn search_recursive(arr: &[i32], target: i32, index: usize, indices_checked: &mut Vec<usize>) -> isize {
+    // Recursive function to search for the target value in the list.
+    if index >= arr.len() {
+        return -1;
+    }
+    indices_checked.push(index);
+    if arr[index] == target {
+        return index as isize;
+    }
+    search_recursive(arr, target, index + 1, indices_checked)
+}
+
+fn recursive_search(arr: &[i32], target: i32) -> (isize, Vec<usize>) {
+    // Wrapper function to initiate recursive search.
+    let mut indices_checked = Vec::new();
+    let result = search_recursive(arr, target, 0, &mut indices_checked);
+    (result, indices_checked)
+}
+
+fn main() {
+    let array = [2, 3, 4, 8, 5, 9, 1, 6, 5, 7, 5];
+    let target = 6;
+    let (result, indices) = recursive_search(&array, target);
+    println!("Target {} found at index {} with indices checked: {:?}", target, result, indices);
+}
+```
+
+In this program, the `search_recursive` function recursively searches for the target element in the list and appends the indices checked to the `indices_checked` list. The `recursive_search` function acts as a wrapper to initiate the recursive search and return the result along with the list of indices checked.
+
+[Tests]
+To test the implementation, we need to ensure that both the index of the target element and the list of indices checked are correct. Here are the test cases:
+
+```rust
+// Test case 1: Target found in the list
+let arr1 = vec![2, 3, 4, 8, 5, 9, 1, 6, 5, 7, 5];
+let target1 = 6;
+let expected_result1 = arr1.iter().position(|&x| x == target1).unwrap() as isize;
+let expected_indices1: Vec<usize> = (0..=expected_result1 as usize).collect();
+let (result1, indices_checked1) = recursive_search(&arr1, target1);
+assert_eq!(result1, expected_result1);
+assert_eq!(indices_checked1, expected_indices1);
+
+// Test case 2: Target not found in the list
+let arr2 = vec![1, 2, 3, 4, 5];
+let target2 = 6;
+let expected_result2 = -1;
+let expected_indices2: Vec<usize> = (0..arr2.len()).collect();
+let (result2, indices_checked2) = recursive_search(&arr2, target2);
+assert_eq!(result2, expected_result2);
+assert_eq!(indices_checked2, expected_indices2);
+
+// Test case 3: Target found at the end of the list
+let arr3 = vec![5, 4, 3, 2, 1];
+let target3 = 1;
+let expected_result3 = (arr3.len() - 1) as isize;
+let expected_indices3: Vec<usize> = (0..=expected_result3 as usize).collect();
+let (result3, indices_checked3) = recursive_search(&arr3, target3);
+assert_eq!(result3, expected_result3);
+assert_eq!(indices_checked3, expected_indices3);
+```
+
+### Example 20
+[Code]
+let mut data = Array2::<f64>::zeros((break_points.last().unwrap().clone(), size_blocks));
+let mut data_stacked = Array2::<f64>::zeros((
+    break_points.last().unwrap() - num_blocks + 1,
+    size_blocks * num_blocks,
+));
+let mut cluster_point_list = Vec::new();
+
+for (counter, &break_pt) in break_points.iter().enumerate() {
+    let cluster = seg_ids[counter];
+    let old_break_pt = if counter == 0 { 0 } else { break_points[counter - 1] };
+
+    for num in old_break_pt..break_pt {
+        // Generate the point from this cluster
+        // println!("num is: {}", num);
+        if num == 0 {
+            // Your logic here when num == 0
+        }
+    }
+}
+[Property]
+category: program implementation
+language: Rust
+difficulty: medium
+concepts: NumPy array initialization, iteration over break points, cluster segmentation, nested loops
+
+[Instruction]
+Implement a Rust program that initializes a NumPy array randomly (0--1) and segments it into clusters based on provided breakpoints. Each cluster is defined by consecutive elements between two breakpoints. The output should be a list of NumPy arrays representing these clusters.
+
+For example, given a size 10 and breakpoints `[3, 6, 8]`, the program should first initialize a NumPy array of 10 random elements between 0 and 1 and then output three clusters: elements at indices `0-2`, `3-5`, `6-7`, and `8-9`. Ensure that the program handles cases where breakpoints are at the boundaries of the array or if there are no breakpoints, in which case the entire array should be a single cluster. Include error handling to manage invalid inputs such as negative array sizes or breakpoints that are out of range.
+
+[Response]
+Here is the program that achieves what you've described:
+
+```rust
+use ndarray::Array1;
+use rand::Rng;
+
+fn segment_array(data: &Array1<f64>, break_points: &[usize]) -> Vec<Array1<f64>> {
+    // Segment the given array into clusters based on specified breakpoints.
+    let mut full_break_points = vec![0];
+    full_break_points.extend_from_slice(break_points);
+    full_break_points.push(data.len());
+
+    let mut segmented_arrays = Vec::new();
+    for i in 0..full_break_points.len() - 1 {
+        let start_index = full_break_points[i];
+        let end_index = full_break_points[i + 1];
+        segmented_arrays.push(data.slice(s![start_index..end_index]).to_owned());
+    }
+    segmented_arrays
+}
+
+fn create_clusters(size: usize, break_points: &[usize]) -> Result<Vec<Array1<f64>>, String> {
+    // Generate and segment a random array of given size using breakpoints.
+    if size == 0 {
+        return Err("Array size must be positive.".to_string());
+    }
+
+    let mut rng = rand::thread_rng();
+    let data = Array1::from((0..size).map(|_| rng.gen::<f64>()).collect::<Vec<f64>>());
+    let clusters = segment_array(&data, break_points);
+    Ok(clusters)
+}
+
+fn main() {
+    let size = 10;
+    let break_points = vec![3, 6, 8];
+    match create_clusters(size, &break_points) {
+        Ok(clusters) => {
+            for (i, cluster) in clusters.iter().enumerate() {
+                println!("Cluster {}: {:?}", i, cluster);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+}
+```
+
+In this implementation, `segment_array` transforms the input data array into a list of NumPy arrays based on the provided breakpoints. The `main` function initializes a random NumPy array of a specified size and calls `segment_array` to segment the array into clusters based on the breakpoints.
+
+[Tests]
+To test the program, we can verify that the values in each cluster are within the expected range (0--1) and that the clusters are correctly segmented. Here are some test cases:
+
+```rust
+fn test_segmentation(size: usize, break_points: &[usize]) {
+    let clusters = create_clusters(size, break_points).expect("Failed to create clusters");
+
+    // Assert that all values in each cluster are within the range [0, 1]
+    for cluster in &clusters {
+        assert!(cluster.iter().all(|&value| value >= 0.0 && value <= 1.0));
+    }
+
+    // Assert the length of each segment matches the expected length
+    let mut full_break_points = vec![0];
+    full_break_points.extend_from_slice(break_points);
+    full_break_points.push(size);
+    for i in 0..full_break_points.len() - 1 {
+        let expected_length = full_break_points[i + 1] - full_break_points[i];
+        assert_eq!(clusters[i].len(), expected_length);
+    }
+}
+
+let test_cases = vec![
+    (20, vec![5, 10, 15]),
+    (10, vec![3, 6, 8]),
+    (15, vec![3, 6, 12]),
+    (30, vec![7, 14, 21, 27]),
+    (5, vec![1]),
+    (10, vec![]),
+    (50, vec![10, 20, 30, 40]),
+];
+
+for (size, break_points) in test_cases {
+    test_segmentation(size, &break_points);
+}
+
+```
+
+### Example 21
+[Code]
+let mut match_case_flag = match_case == "auto";
+
+if match_case_flag {
+    let lower_case_ch_names: Vec<String> = ch_names.iter().map(|s| s.to_lowercase()).collect();
+    let unique_lower_case_ch_names: HashSet<_> = lower_case_ch_names.iter().collect();
+    let unique_ch_names: HashSet<_> = ch_names.iter().collect();
+
+    if unique_lower_case_ch_names.len() < unique_ch_names.len() {
+        match_case_flag = true;
+    } else {
+        match_case_flag = false;
+    }
+}
+
+let (ch_names, pick_chs): (Vec<String>, Vec<String>) = if match_case_flag {
+    (ch_names.clone(), pick_chs.clone())
+} else {
+    (
+        ch_names.iter().map(|s| s.to_lowercase()).collect(),
+        pick_chs.iter().map(|s| s.to_lowercase()).collect(),
+    )
+};
+
+// Find indices of the pick channels in ch_names
+let mut picks = Vec::new();
+for (index, ch_name) in ch_names.iter().enumerate() {
+    if pick_chs.contains(ch_name) {
+        picks.push(index);
+    }
+}
+
+// Optionally sort the picks based on `ordered`
+if ordered {
+    picks.sort_by_key(|&index| pick_chs.iter().position(|ch| ch == &ch_names[index]));
+}
+
+picks
+}
+
+[Property]
+category: program implementation
+language: Rust
+difficulty: medium
+concepts: case-insensitive string matching, controlled case matching based on an option, list comprehension
+
+[Instruction]
+Construct a Rust program that processes a list of strings provided by the user. The first element is a target string, the second is either 'CaseSensitive' or 'CaseInsensitive' to determine the matching approach, and the remaining elements are candidates for comparison. The program should output the number of times the target appears among the candidates according to the specified matching rule. The solution should include robust error handling to validate the matching rule and check that at least two strings are provided before proceeding.
+
+For example, given the input `['apple', 'CaseInsensitive', 'Apple', 'banana', 'APPLE']`, the program should output `2` since 'Apple' and 'APPLE' match the target 'apple' in a case-insensitive manner.
+
+[Response]
+Here's a Rust program that fulfills the requirements you specified. It first parses the input list to validate the presence of the target string and matching rule. Then, it compares the target with the candidate strings, adjusting for case sensitivity as specified. Finally, it outputs the count of matches.
+
+```rust
+use std::io::{self, Write};
+
+fn count_matches(input_list: &[String]) -> Result<usize, String> {
+    if input_list.len() < 3 {
+        return Err("Input list must contain at least two items: the target string and the matching rule.".to_string());
+    }
+
+    let target_string = &input_list[0];
+    let matching_rule = &input_list[1];
+
+    if matching_rule != "CaseSensitive" && matching_rule != "CaseInsensitive" {
+        return Err("Matching rule must be either 'CaseSensitive' or 'CaseInsensitive'.".to_string());
+    }
+
+    let candidates = &input_list[2..];
+    let match_count = if matching_rule == "CaseSensitive" {
+        candidates.iter().filter(|&candidate| candidate == target_string).count()
+    } else {
+        let target_string_lower = target_string.to_lowercase();
+        candidates.iter().filter(|&candidate| candidate.to_lowercase() == target_string_lower).count()
+    };
+
+    Ok(match_count)
+}
+
+fn main() {
+    print!("Enter input list: ");
+    io::stdout().flush().unwrap();
+    
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("Failed to read input");
+    let input_list: Vec<String> = input.trim().split_whitespace().map(|s| s.to_string()).collect();
+
+    match count_matches(&input_list) {
+        Ok(count) => println!("{}", count),
+        Err(e) => eprintln!("Error: {}", e),
+    }
+}
+```
+
+The `count_matches` function implements the main logic of the program, counting the occurrences of the target string among the candidate strings based on the specified matching rule. The `main` function reads the input list from the user, calls `count_matches`, and prints the count of matches.
+
+[Tests]
+You can test the program with various inputs to ensure it handles different scenarios correctly:
+
+```rust
+// Normal assertions
+assert_eq!(
+    count_matches(&vec![
+        "apple".to_string(),
+        "CaseInsensitive".to_string(),
+        "Apple".to_string(),
+        "banana".to_string(),
+        "APPLE".to_string()
+    ])
+    .unwrap(),
+    2
+);
+
+assert_eq!(
+    count_matches(&vec![
+        "apple".to_string(),
+        "CaseSensitive".to_string(),
+        "Apple".to_string(),
+        "banana".to_string(),
+        "APPLE".to_string()
+    ])
+    .unwrap(),
+    0
+);
+
+assert_eq!(
+    count_matches(&vec!["apple".to_string(), "CaseInsensitive".to_string()]).unwrap(),
+    0
+);
+
+assert_eq!(
+    count_matches(&vec![
+        "apple".to_string(),
+        "CaseInsensitive".to_string(),
+        "apple".to_string(),
+        "APPLE".to_string(),
+        "aPpLe".to_string(),
+        "banana".to_string()
+    ])
+    .unwrap(),
+    3
+);
+
+assert_eq!(
+    count_matches(&vec![
+        "apple".to_string(),
+        "CaseSensitive".to_string(),
+        "apple".to_string(),
+        "APPLE".to_string(),
+        "aPpLe".to_string(),
+        "banana".to_string()
+    ])
+    .unwrap(),
+    1
+);
+
+// Error handling assertions
+match count_matches(&vec!["apple".to_string()]) {
+    Ok(_) => panic!("Expected an error, but got a result"),
+    Err(e) => assert_eq!(
+        e,
+        "Input list must contain at least two items: the target string and the matching rule."
+    ),
+}
+
+match count_matches(&vec![
+    "apple".to_string(),
+    "InvalidRule".to_string(),
+    "Apple".to_string(),
+]) {
+    Ok(_) => panic!("Expected an error, but got a result"),
+    Err(e) => assert_eq!(
+        e,
+        "Matching rule must be either 'CaseSensitive' or 'CaseInsensitive'."
+    ),
+}
+```

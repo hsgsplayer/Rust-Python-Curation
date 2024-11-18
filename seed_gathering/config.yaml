@@ -1,0 +1,12 @@
+# Processing settings
+num_workers: 4
+chunk_multiplier: 1000
+
+# Dataset settings
+dataset_name: "bigcode/the-stack-v2-dedup"
+dataset_subset: "Python"
+cache_dir: "../stack"
+streaming: true
+
+# S3 settings
+s3_unsigned: true
