@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export MODE="S->C"
-export SEED_DATA_FILE="../seed_gathering/datasets_rust/seed2/output_step2.json"
+export MODE="I->R"
+export SEED_DATA_FILE="../datasets_rust/seed4/data-sc2-8shot-c_i-8fb62-1-20241121_213526.jsonl"
 export INDEX=1
 export MAX_NEW_DATA=1000
 export OPENAI_API_KEY="EMPTY"
@@ -18,7 +18,8 @@ if [[ "$MODE" == "I->R" ]]; then
     N_SAMPLES=1
     NUM_FEWSHOTS=1
     # NUM_BATCHED_REQUESTS=4096
-    ASYNC_MICRO_BATCH_SIZE=96
+    NUM_BATCHED_REQUESTS=96
+    ASYNC_MICRO_BATCH_SIZE=8
 else
     N_SAMPLES=1
     NUM_FEWSHOTS=8
